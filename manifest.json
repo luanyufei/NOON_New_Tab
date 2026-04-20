@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "NOON Infinite New Tab",
+  "version": "1.0.0",
+  "description": "A Chrome new tab clone with unlimited shortcuts.",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://suggestqueries.google.com/*",
+    "https://www.google.com/*"
+  ],
+  "chrome_url_overrides": {
+    "newtab": "index.html"
+  }
+}

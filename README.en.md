@@ -3,16 +3,14 @@
 # NOON New Tab
 
 [![license](https://img.shields.io/badge/license-MIT-8ab4f8?style=flat-square)](#license)
-[![release](https://img.shields.io/github/v/release/YOUR_GITHUB_USERNAME/NOON_New_Tab?style=flat-square)](https://github.com/YOUR_GITHUB_USERNAME/NOON_New_Tab/releases)
-[![downloads](https://img.shields.io/github/downloads/YOUR_GITHUB_USERNAME/NOON_New_Tab/total?style=flat-square)](https://github.com/YOUR_GITHUB_USERNAME/NOON_New_Tab/releases)
+[![release](https://img.shields.io/github/v/release/luanyufei/NOON_New_Tab?style=flat-square)](https://github.com/luanyufei/NOON_New_Tab/releases)
+[![downloads](https://img.shields.io/github/downloads/luanyufei/NOON_New_Tab/total?style=flat-square)](https://github.com/luanyufei/NOON_New_Tab/releases)
 
 [中文](./README.md) | English
 
 </div>
 
 A customizable Chrome new tab extension inspired by the Chrome / Google new tab experience, extended with unlimited shortcuts, drag-and-drop sorting, theme switching, config import/export, and optional custom logo support.
-
-> Note: the `release` and `downloads` badges above currently use the placeholder repository path `YOUR_GITHUB_USERNAME/NOON_New_Tab`. After you upload the project to GitHub, replace that placeholder with your real repository path.
 
 ## Features
 
@@ -101,7 +99,8 @@ After that, opening a new tab will load this extension page.
 
 ## License
 
-The README currently shows an MIT-style license badge. If you plan to make the repository public and reusable, you should add a real `LICENSE` file.
+This project is licensed under the MIT License.
+
 
 ## Possible Next Steps
 
@@ -110,4 +109,3 @@ The README currently shows an MIT-style license badge. If you plan to make the r
 - Shortcut search / filtering
 - More polished drag-and-drop animations
 - Better responsive layout behavior
-

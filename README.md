@@ -3,16 +3,14 @@
 # NOON New Tab
 
 [![license](https://img.shields.io/badge/license-MIT-8ab4f8?style=flat-square)](#许可证)
-[![release](https://img.shields.io/github/v/release/YOUR_GITHUB_USERNAME/NOON_New_Tab?style=flat-square)](https://github.com/YOUR_GITHUB_USERNAME/NOON_New_Tab/releases)
-[![downloads](https://img.shields.io/github/downloads/YOUR_GITHUB_USERNAME/NOON_New_Tab/total?style=flat-square)](https://github.com/YOUR_GITHUB_USERNAME/NOON_New_Tab/releases)
+[![release](https://img.shields.io/github/v/release/luanyufei/NOON_New_Tab?style=flat-square)](https://github.com/luanyufei/NOON_New_Tab/releases)
+[![downloads](https://img.shields.io/github/downloads/luanyufei/NOON_New_Tab/total?style=flat-square)](https://github.com/luanyufei/NOON_New_Tab/releases)
 
 中文 | [English](./README.en.md)
 
 </div>
 
 一个可自定义的 Chrome 新标签页扩展项目，参考了 Chrome / Google 新标签页的交互体验，并扩展出了无限快捷方式、拖拽排序、主题切换、配置导入导出和自定义 Logo 等功能。
-
-> 提示：上面的 `release` 和 `downloads` 徽章目前使用的是占位仓库路径 `YOUR_GITHUB_USERNAME/NOON_New_Tab`。等你把项目上传到 GitHub 后，把 README 里的这个占位符替换成你的真实仓库路径即可生效。
 
 ## 功能特性
 
@@ -101,7 +99,7 @@
 
 ## 许可证
 
-当前 README 徽章使用的是 MIT 风格展示。如果你准备公开仓库并允许他人复用，建议补一个正式的 `LICENSE` 文件。
+本项目使用 MIT License。
 
 ## 后续可扩展方向
 
@@ -110,4 +108,3 @@
 - 快捷方式搜索 / 过滤
 - 更丝滑的拖拽动画
 - 更完善的自适应布局
-

@@ -10,6 +10,7 @@
     <div class="page-shell">
       <header class="topbar">
         <div class="topbar__actions">
+          <button class="chip-button" id="languageToggleButton" type="button" aria-label="切换语言">中 / EN</button>
           <button class="icon-toggle" id="themeToggleButton" type="button" aria-label="切换主题">
             <svg class="theme-icon theme-icon--sun" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path d="M12 3.75v2.1m0 12.3v2.1m8.25-8.25h-2.1M5.85 12H3.75m14.08 5.83-1.49-1.49M7.66 7.66 6.17 6.17m11.66 0-1.49 1.49M7.66 16.34l-1.49 1.49" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
@@ -30,15 +31,13 @@
               <button class="topbar-menu__item" id="clearLogoButton" type="button" role="menuitem">清除自定义 Logo</button>
               <button class="topbar-menu__item" id="exportConfigButton" type="button" role="menuitem">导出链接配置</button>
               <button class="topbar-menu__item" id="importConfigButton" type="button" role="menuitem">导入链接配置</button>
+              <button class="topbar-menu__item" id="helpButton" type="button" role="menuitem">使用帮助</button>
             </div>
           </div>
         </div>
       </header>
 
       <main class="hero">
-        <section class="custom-logo-panel" id="customLogoPanel" hidden aria-label="自定义 Logo 区域">
-          <img class="custom-logo-panel__image" id="customLogoImage" alt="自定义 Logo">
-        </section>
         <img
           class="hero__logo"
           id="googleLogo"
@@ -62,11 +61,52 @@
 
         <section class="shortcuts" aria-labelledby="shortcutTitle">
           <h2 class="sr-only" id="shortcutTitle">快捷方式</h2>
-          <div class="shortcut-grid" id="shortcutGrid" role="list">
-            <button class="shortcut-add-card" id="addShortcutButton" type="button" aria-label="添加快捷方式">
-              <span class="shortcut-add-card__icon" aria-hidden="true">+</span>
-              <span class="shortcut-add-card__label">添加快捷方式</span>
-            </button>
+          <div class="shortcut-explorer">
+            <aside class="category-sidebar" aria-labelledby="categorySidebarTitle">
+              <div class="category-sidebar__header">
+                <div class="category-sidebar__header-main">
+                  <h3 class="category-sidebar__title" id="categorySidebarTitle">分类</h3>
+                  <span class="category-sidebar__count" id="categorySummaryCount">0</span>
+                </div>
+                <button class="icon-button icon-button--small" id="addCategoryButton" type="button" aria-label="添加分类">
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                  </svg>
+                </button>
+              </div>
+              <label class="local-search local-search--sidebar">
+                <span class="sr-only">搜索分类</span>
+                <input id="categorySearchInput" type="search" placeholder="搜索分类">
+              </label>
+              <div class="category-list" id="categoryList" role="list"></div>
+            </aside>
+
+            <div class="shortcut-browser">
+              <div class="shortcut-toolbar">
+                <label class="local-search">
+                  <span class="sr-only">搜索快捷方式</span>
+                  <input id="shortcutSearchInput" type="search" placeholder="搜索快捷方式、网址或分类">
+                </label>
+                <label class="sort-field">
+                  <span class="sort-field__label">排序</span>
+                  <select id="sortSelect">
+                    <option value="click-desc">按频次排序</option>
+                    <option value="manual">手动顺序</option>
+                    <option value="name-asc">名称 A-Z</option>
+                    <option value="name-desc">名称 Z-A</option>
+                    <option value="newest">最近添加</option>
+                    <option value="oldest">最早添加</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="shortcut-grid" id="shortcutGrid" role="list">
+                <button class="shortcut-add-card" id="addShortcutButton" type="button" aria-label="添加快捷方式">
+                  <span class="shortcut-add-card__icon" aria-hidden="true">+</span>
+                  <span class="shortcut-add-card__label">添加快捷方式</span>
+                </button>
+              </div>
+            </div>
           </div>
         </section>
       </main>
@@ -95,6 +135,12 @@
           <input id="urlInput" name="url" type="text" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="例如：bilibili.com" required>
         </label>
 
+        <label class="field">
+          <span>分类</span>
+          <input id="categoriesInput" name="categories" type="text" maxlength="160" list="categorySuggestions" placeholder="例如：视频|Video, 娱乐|Entertainment">
+          <small class="field__hint">可选已有分类；直接输入可新建。多个分类可用中英文逗号分隔，用｜分隔中英文（可选）</small>
+        </label>
+
         <div class="shortcut-form__actions">
           <button class="ghost-button" id="deleteShortcutButton" type="button" hidden>删除</button>
           <div class="shortcut-form__action-group">
@@ -113,6 +159,7 @@
           </div>
           <div class="shortcut-card__content">
             <h3 class="shortcut-card__title"></h3>
+            <p class="shortcut-card__meta"></p>
           </div>
         </a>
         <div class="shortcut-card__actions">
@@ -125,8 +172,30 @@
       </article>
     </template>
 
+    <datalist id="categorySuggestions"></datalist>
     <input id="logoUploadInput" type="file" accept="image/*" hidden>
     <input id="importConfigInput" type="file" accept="application/json" hidden>
+
+    <dialog class="help-dialog" id="helpDialog">
+      <div class="help-dialog__panel">
+        <div class="shortcut-form__header">
+          <h2 class="shortcut-form__title" id="helpDialogTitle">使用帮助</h2>
+          <button class="icon-button" id="closeHelpDialogButton" type="button" aria-label="关闭帮助">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="m7.05 7.05 9.9 9.9m0-9.9-9.9 9.9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
+        <div class="help-dialog__content" id="helpDialogContent">
+          <p>1. 使用“添加快捷方式”新增链接，可填写名称、网址和分类。</p>
+          <p>2. 分类支持直接输入，也支持用“｜”分隔中英文名称。</p>
+          <p>3. 左侧分类可筛选；拖动链接到分类上即可把链接加入该分类。</p>
+          <p>4. 排序支持按点击频次、名称、时间和手动顺序。</p>
+          <p>5. 可通过菜单导入导出配置，或上传自定义 Logo 替换主页 Google Logo。</p>
+        </div>
+      </div>
+    </dialog>
+
     <script src="./script.js"></script>
   </body>
 </html>

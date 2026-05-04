@@ -10,7 +10,7 @@
 
 </div>
 
-A customizable new tab extension that tries to stay close to the native Chrome / Google new tab experience, while adding unlimited shortcuts, drag-and-drop sorting, theme switching, config import/export, and custom logo support.
+A customizable new tab extension that tries to stay close to the native Chrome / Google new tab experience, while adding unlimited shortcuts, category management, local search, sorting, theme switching, config import/export, and custom logo support.
 
 <img src="./docs/images/ea657d70-7dc7-4636-b85f-c2e9cc2142e5.png" alt="NOON New Tab preview" width="720">
 
@@ -29,15 +29,21 @@ Because of that, I am not publishing it to the Chrome Web Store for now. If I de
 - Unlimited shortcut links
 - Drag-and-drop shortcut sorting
 - Add, edit, and delete shortcuts
+- Category sidebar, category search, category rename, and category deletion
+- Drag shortcuts onto a category to add that category quickly
+- Local shortcut search
+- Multiple sorting modes, including frequency-based sorting
+- Bilingual category names with `中文｜English` format and a top-right language toggle
 - Search box with suggestion dropdown
 - Light and dark theme switching
 - Import / export shortcut config as JSON
-- Custom logo upload / clear
+- Custom logo upload / clear that replaces the central Google logo
+- Built-in help panel
 - Override the new tab page through `chrome_url_overrides.newtab`
 
 ## How to use
 
-1. First, download the ZIP package of this project as shown below, then extract it to a local folder.
+1. First, download the ZIP package of this project or the packaged extension ZIP from Releases, then extract it to a local folder.
 
 <img src="./docs/images/4281aec3-774e-4310-b912-21b510f5b663.png" alt="Download ZIP" width="720">
 
@@ -49,7 +55,14 @@ Because of that, I am not publishing it to the Chrome Web Store for now. If I de
 
 <img src="./docs/images/1159439f-e677-406d-846a-c99c5c5da6bc.png" alt="Load unpacked extension" width="720">
 
-4. After that, open a new tab and Chrome will load this extension page. Done!
+4. After that, open a new tab and Chrome will load this extension page.
+
+5. Common actions:
+- Click “Add shortcut” to create a new link
+- In the category field, you can pick an existing category or type a new one
+- Separate multiple categories with English or Chinese commas; split Chinese and English names with `｜` or `|`
+- Drag a shortcut onto a category in the left sidebar to add that category
+- Use the top-right controls for language switching, theme switching, logo replacement, import/export, and help
 
 ## Notes
 
@@ -60,4 +73,3 @@ Because of that, I am not publishing it to the Chrome Web Store for now. If I de
 ## License
 
 This project is licensed under the MIT License.
-

@@ -12,7 +12,7 @@
 
 一个尽可能贴近 Chrome / Google 原生新标签页体验的可自定义新标签页扩展，支持无限快捷方式、分类管理、本地搜索、排序、主题切换、配置导入导出和自定义 Logo。
 
-<img src="./docs/images/ea657d70-7dc7-4636-b85f-c2e9cc2142e5.png" alt="NOON New Tab preview" width="720">
+<img src="./docs/images/preview-v1.1.0.png" alt="NOON New Tab preview" width="720">
 
 ## 项目背景
 

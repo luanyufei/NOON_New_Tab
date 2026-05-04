@@ -12,7 +12,7 @@
 
 A customizable new tab extension that tries to stay close to the native Chrome / Google new tab experience, while adding unlimited shortcuts, category management, local search, sorting, theme switching, config import/export, and custom logo support.
 
-<img src="./docs/images/ea657d70-7dc7-4636-b85f-c2e9cc2142e5.png" alt="NOON New Tab preview" width="720">
+<img src="./docs/images/preview-v1.1.0.png" alt="NOON New Tab preview" width="720">
 
 ## Background
 

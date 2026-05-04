@@ -6,7 +6,7 @@
 [![release](https://img.shields.io/github/v/release/luanyufei/NOON_New_Tab?style=flat-square)](https://github.com/luanyufei/NOON_New_Tab/releases)
 [![downloads](https://img.shields.io/github/downloads/luanyufei/NOON_New_Tab/total?style=flat-square)](https://github.com/luanyufei/NOON_New_Tab/releases)
 
-[中文](./README.md) | English
+[中文](./README.zh-CN.md) | English
 
 </div>
 

@@ -2,74 +2,74 @@
 
 # NOON New Tab
 
-[![license](https://img.shields.io/badge/license-MIT-8ab4f8?style=flat-square)](#许可证)
+[![license](https://img.shields.io/badge/license-MIT-8ab4f8?style=flat-square)](#license)
 [![release](https://img.shields.io/github/v/release/luanyufei/NOON_New_Tab?style=flat-square)](https://github.com/luanyufei/NOON_New_Tab/releases)
 [![downloads](https://img.shields.io/github/downloads/luanyufei/NOON_New_Tab/total?style=flat-square)](https://github.com/luanyufei/NOON_New_Tab/releases)
 
-中文 | [English](./README.en.md)
+[中文](./README.zh-CN.md) | English
 
 </div>
 
-一个尽可能贴近 Chrome / Google 原生新标签页体验的可自定义新标签页扩展，支持无限快捷方式、分类管理、本地搜索、排序、主题切换、配置导入导出和自定义 Logo。
+A customizable new tab extension that tries to stay close to the native Chrome / Google new tab experience, while adding unlimited shortcuts, category management, local search, sorting, theme switching, config import/export, and custom logo support.
 
 <img src="./docs/images/preview-v1.1.0.png" alt="NOON New Tab preview" width="720">
 
-## 项目背景
+## Background
 
-我做这个扩展的原因很直接。Chrome 自带的新标签页不支持无限添加链接，而市面上很多新标签页扩展要么收费，要么做得太花哨，但用户最核心的需求其实只是一个干净、顺手、稳定、支持大量快捷方式的新标签页。
+The reason I built this extension is very straightforward. Chrome’s built-in new tab page does not support unlimited shortcut links, while many third-party new tab extensions are either paid or overly flashy. But the most important user need is actually much simpler: a clean, smooth, stable new tab page that supports a large number of shortcuts.
 
-所以这个项目的目标不是“做一个炫酷的桌面门户”，而是尽量复刻 Chrome 新标签页那种简单直接的体验，并把最核心的功能补齐。
+So the goal of this project is not to build a flashy dashboard, but to recreate the simple and direct Chrome new tab experience while improving the most important missing capability.
 
-这个项目目前的目标是复刻 Chrome 新标签页，因此界面中包含了 Google 的 logo，并整体参考了 Chrome / Google 新标签页的视觉与交互风格。
+At the moment, this project is meant to reproduce the Chrome new tab page, so it still includes the Google logo and follows the visual and interaction style of the Chrome / Google new tab page.
 
-出于这一点考虑，我暂时没有把它上传到 Chrome Web Store。后续如果要正式上架扩展商店，可以考虑替换掉当前的 Google logo，进一步去掉可能引起“官方产品误认”的视觉元素，再按商店规范整理后发布。
+Because of that, I am not publishing it to the Chrome Web Store for now. If I decide to publish it later, I may replace the current Google logo, remove visual elements that could make it look too close to an official Google product, and then prepare it again according to store policies.
 
-## 功能特性
+## Features
 
-- 无限添加快捷方式
-- 快捷方式拖拽排序
-- 新增、编辑、删除快捷方式
-- 分类侧栏、分类搜索、分类重命名与删除
-- 支持把快捷方式拖到左侧分类中，快速追加分类
-- 快捷方式本地搜索
-- 多种排序方式，包括按频次排序
-- 分类支持 `中文｜English` 双语命名，并可在页面右上角切换语言
-- 带候选词下拉的搜索框
-- 明暗主题切换
-- 导入 / 导出快捷方式 JSON 配置
-- 自定义 Logo 上传 / 清除（替换中间的 Google Logo）
-- 内置“使用帮助”面板
-- 通过 `chrome_url_overrides.newtab` 覆盖新标签页
+- Unlimited shortcut links
+- Drag-and-drop shortcut sorting
+- Add, edit, and delete shortcuts
+- Category sidebar, category search, category rename, and category deletion
+- Drag shortcuts onto a category to add that category quickly
+- Local shortcut search
+- Multiple sorting modes, including frequency-based sorting
+- Bilingual category names with `中文｜English` format and a top-right language toggle
+- Search box with suggestion dropdown
+- Light and dark theme switching
+- Import / export shortcut config as JSON
+- Custom logo upload / clear that replaces the central Google logo
+- Built-in help panel
+- Override the new tab page through `chrome_url_overrides.newtab`
 
-## 使用方法
+## How to use
 
-1、首先下载本项目的 ZIP 文件夹或 Release 附件中的扩展压缩包。下载完后解压到一个文件夹里备用。
+1. First, download the ZIP package of this project or the packaged extension ZIP from Releases, then extract it to a local folder.
 
 <img src="./docs/images/4281aec3-774e-4310-b912-21b510f5b663.png" alt="Download ZIP" width="720">
 
-2、打开 Chrome 的扩展页面。可以按如图所示的方法打开，也可以直接在 Chrome 地址栏输入 `chrome://extensions/`。
+2. Open Chrome’s extensions page. You can open it as shown below, or type `chrome://extensions/` directly in the address bar.
 
 <img src="./docs/images/0c3eedfc-54af-4833-be04-f8cb0a90c950.png" alt="Open extensions page" width="720">
 
-3、打开右上角的 `开发者模式`，然后点击 `加载已解压的扩展程序`，选择刚刚解压后的文件夹。
+3. Turn on `Developer mode` in the top-right corner, then click `Load unpacked` and select the extracted folder.
 
 <img src="./docs/images/1159439f-e677-406d-846a-c99c5c5da6bc.png" alt="Load unpacked extension" width="720">
 
-4、之后新开一个标签页，就会进入这个扩展的新标签页界面。
+4. After that, open a new tab and Chrome will load this extension page.
 
-5、常用操作：
-- 点击“添加快捷方式”新增链接
-- 在分类输入框里可直接选已有分类，也可手动输入新分类
-- 多个分类可用中英文逗号分隔；中英文名称可用 `｜` 或 `|` 分隔
-- 拖动快捷方式到左侧分类上，可直接把链接加入该分类
-- 右上角支持语言切换、主题切换、Logo 替换、导入导出和“使用帮助”
+5. Common actions:
+- Click “Add shortcut” to create a new link
+- In the category field, you can pick an existing category or type a new one
+- Separate multiple categories with English or Chinese commas; split Chinese and English names with `｜` or `|`
+- Drag a shortcut onto a category in the left sidebar to add that category
+- Use the top-right controls for language switching, theme switching, logo replacement, import/export, and help
 
-## 说明
+## Notes
 
-- 这是个人项目，与 Google 无官方关联
-- 界面风格参考了 Chrome / Google 新标签页，但核心目标是补足原生新标签页在快捷方式管理上的不足
-- `reference/` 仅作为开发时参考资料，不纳入版本控制
+- This is a personal project and is not affiliated with Google
+- The UI style is inspired by the Chrome / Google new tab page, but the core goal is to improve the shortcut management limitations of the native new tab page
+- `reference/` is only used as development reference material and is excluded from version control
 
-## 许可证
+## License
 
-本项目使用 MIT License。
+This project is licensed under the MIT License.

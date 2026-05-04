@@ -7,6 +7,7 @@ const LANGUAGE_STORAGE_KEY = "noon-new-tab-language-v1";
 const GOOGLE_SUGGEST_ENDPOINT = "https://suggestqueries.google.com/complete/search?client=firefox&hl=zh-CN&q=";
 const GOOGLE_LOGO_LIGHT = "https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png";
 const GOOGLE_LOGO_DARK = "https://www.google.com/images/branding/googlelogo/2x/googlelogo_light_color_272x92dp.png";
+const SYNC_CHUNK_SIZE = 7000;
 
 const defaultShortcuts = [
   {
@@ -63,9 +64,9 @@ const translations = {
     addShortcutTitle: "添加快捷方式",
     editShortcutTitle: "编辑快捷方式",
     fieldName: "名称",
-    fieldNamePlaceholder: "例如：YouTube",
+    fieldNamePlaceholder: "例如：油管｜YouTube",
     fieldUrl: "网址",
-    fieldUrlPlaceholder: "例如：bilibili.com",
+    fieldUrlPlaceholder: "例如：youtube.com",
     fieldCategories: "分类",
     fieldCategoriesPlaceholder: "例如：视频｜Video，娱乐｜Entertainment",
     fieldCategoriesHint: "可选已有分类；直接输入可新建。多个分类可用中英文逗号分隔，用｜或 | 分隔中英文（可选）",
@@ -94,6 +95,8 @@ const translations = {
     importFailed: "导入失败：这个文件不是有效的链接配置。",
     logoUploadFailed: "上传 Logo 失败，请换一张图片再试。",
     deleteCategoryConfirm: "删除这个分类？这不会删除链接，只会移除链接上的该分类。",
+    renameCategoryPrompt: "重命名分类。用｜或 | 分隔中英文（可选）",
+    saveFailed: "保存失败。已尝试回退到本地存储，请刷新后重试。",
   },
   en: {
     languageButton: "EN / 中",
@@ -112,9 +115,9 @@ const translations = {
     addShortcutTitle: "Add shortcut",
     editShortcutTitle: "Edit shortcut",
     fieldName: "Name",
-    fieldNamePlaceholder: "Example: YouTube",
+    fieldNamePlaceholder: "Example: 油管｜YouTube",
     fieldUrl: "URL",
-    fieldUrlPlaceholder: "Example: bilibili.com",
+    fieldUrlPlaceholder: "Example: youtube.com",
     fieldCategories: "Categories",
     fieldCategoriesPlaceholder: "Example: 视频｜Video, 娱乐｜Entertainment",
     fieldCategoriesHint: "Pick an existing category or type to create one. Separate multiple categories with Chinese or English commas. Use ｜ or | to split Chinese and English names (optional).",
@@ -144,6 +147,7 @@ const translations = {
     logoUploadFailed: "Logo upload failed. Try a different image.",
     deleteCategoryConfirm: "Delete this category? Links will be kept and only this category label will be removed.",
     renameCategoryPrompt: "Rename category. Use ｜ or | to split Chinese and English labels (optional).",
+    saveFailed: "Save failed. Fallback local storage was attempted. Refresh and try again.",
   },
 };
 
@@ -636,7 +640,7 @@ async function handleShortcutSubmit(event) {
   const categories = parseCategories(String(formData.get("categories") ?? ""));
   const shortcut = {
     id: state.editingId ?? crypto.randomUUID(),
-    name: String(formData.get("name") ?? "").trim(),
+    name: normalizeLocalizedLabel(String(formData.get("name") ?? "").trim()),
     url: normalizeUrl(rawUrl, true),
     categories,
     createdAt: existingShortcut?.createdAt ?? Date.now(),
@@ -658,12 +662,17 @@ async function handleShortcutSubmit(event) {
   }
 
   mergeCategoryDefinitions(categories);
-  await persistAll();
-  syncSelectedCategory();
-  renderCategorySuggestions();
-  renderCategories();
-  renderShortcuts();
-  closeDialog();
+  try {
+    await persistAll();
+    syncSelectedCategory();
+    renderCategorySuggestions();
+    renderCategories();
+    renderShortcuts();
+    closeDialog();
+  } catch (error) {
+    console.error("Failed to save shortcut", error);
+    window.alert(t("saveFailed"));
+  }
 }
 
 function handleShortcutFormKeydown(event) {
@@ -737,7 +746,7 @@ function renderShortcuts() {
     node.dataset.id = shortcut.id;
     node.draggable = true;
     link.href = shortcut.url;
-    title.textContent = shortcut.name;
+    title.textContent = displayShortcutName(shortcut.name);
     meta.textContent = shortcut.categories.length
       ? shortcut.categories.map(displayCategoryName).join(" · ")
       : t("uncategorized");
@@ -1068,7 +1077,7 @@ async function loadShortcuts() {
     const normalized = parsed
       .map((item) => ({
         id: String(item.id ?? crypto.randomUUID()),
-        name: String(item.name ?? "").trim(),
+        name: normalizeLocalizedLabel(String(item.name ?? "").trim()),
         url: String(item.url ?? "").trim(),
         categories: normalizeCategories(item.categories),
         createdAt: normalizeCreatedAt(item.createdAt),
@@ -1188,7 +1197,7 @@ async function handleImportConfig(event) {
     const importedShortcuts = shortcutsSource
       .map((item) => ({
         id: String(item.id ?? crypto.randomUUID()),
-        name: String(item.name ?? "").trim(),
+        name: normalizeLocalizedLabel(String(item.name ?? "").trim()),
         url: normalizeUrl(String(item.url ?? "").trim(), true),
         categories: normalizeCategories(item.categories),
         createdAt: normalizeCreatedAt(item.createdAt),
@@ -1321,6 +1330,10 @@ function mergeCategoryDefinitions(categories) {
 }
 
 function normalizeCategoryLabel(value) {
+  return normalizeLocalizedLabel(value);
+}
+
+function normalizeLocalizedLabel(value) {
   return String(value ?? "")
     .replaceAll("｜", "|")
     .split("|")
@@ -1359,7 +1372,15 @@ function parseCategories(value) {
 }
 
 function displayCategoryName(value) {
-  const [zh, en] = normalizeCategoryLabel(value).split("|");
+  const [zh, en] = normalizeLocalizedLabel(value).split("|");
+  if (state.language === "en") {
+    return en || zh || "";
+  }
+  return zh || en || "";
+}
+
+function displayShortcutName(value) {
+  const [zh, en] = normalizeLocalizedLabel(value).split("|");
   if (state.language === "en") {
     return en || zh || "";
   }
@@ -1406,6 +1427,7 @@ function getVisibleShortcuts() {
 
     const haystack = [
       shortcut.name,
+      displayShortcutName(shortcut.name),
       shortcut.url,
       shortcut.categories.join(" "),
       shortcut.categories.map(displayCategoryName).join(" "),
@@ -1422,9 +1444,9 @@ function sortShortcuts(shortcuts) {
     case "manual":
       return items;
     case "name-asc":
-      return items.sort((left, right) => left.name.localeCompare(right.name, state.language === "en" ? "en" : "zh-CN"));
+      return items.sort((left, right) => displayShortcutName(left.name).localeCompare(displayShortcutName(right.name), state.language === "en" ? "en" : "zh-CN"));
     case "name-desc":
-      return items.sort((left, right) => right.name.localeCompare(left.name, state.language === "en" ? "en" : "zh-CN"));
+      return items.sort((left, right) => displayShortcutName(right.name).localeCompare(displayShortcutName(left.name), state.language === "en" ? "en" : "zh-CN"));
     case "newest":
       return items.sort((left, right) => right.createdAt - left.createdAt);
     case "oldest":
@@ -1482,11 +1504,29 @@ function getFaviconUrl(value) {
 
 async function readStorage(key) {
   if (hasChromeSyncStorage()) {
-    const result = await chrome.storage.sync.get([key]);
-    return result[key];
+    try {
+      const manifestKey = getChunkManifestKey(key);
+      const result = await chrome.storage.sync.get([key, manifestKey]);
+      const manifest = result[manifestKey];
+
+      if (manifest?.chunked && Number.isInteger(manifest.count)) {
+        const chunkKeys = Array.from({length: manifest.count}, (_, index) => getChunkKey(key, index));
+        const chunks = await chrome.storage.sync.get(chunkKeys);
+        const encoded = chunkKeys.map((chunkKey) => String(chunks[chunkKey] ?? "")).join("");
+        if (encoded) {
+          return JSON.parse(decodeBase64Utf8(encoded));
+        }
+      }
+
+      if (result[key] !== undefined) {
+        return result[key];
+      }
+    } catch {
+      // Fall through to local fallback.
+    }
   }
 
-  const rawValue = localStorage.getItem(key);
+  const rawValue = localStorage.getItem(getLocalFallbackKey(key));
   if (!rawValue) {
     return null;
   }
@@ -1500,15 +1540,90 @@ async function readStorage(key) {
 
 async function writeStorage(key, value) {
   if (hasChromeSyncStorage()) {
-    await chrome.storage.sync.set({[key]: value});
-    return;
+    try {
+      await writeSyncStorageChunked(key, value);
+      localStorage.removeItem(getLocalFallbackKey(key));
+      return;
+    } catch {
+      // Fall through to local fallback.
+    }
   }
 
-  localStorage.setItem(key, JSON.stringify(value));
+  localStorage.setItem(getLocalFallbackKey(key), JSON.stringify(value));
 }
 
 function hasChromeSyncStorage() {
   return typeof chrome !== "undefined" && Boolean(chrome.storage?.sync);
+}
+
+function getLocalFallbackKey(key) {
+  return `fallback:${key}`;
+}
+
+function getChunkManifestKey(key) {
+  return `${key}__manifest`;
+}
+
+function getChunkKey(key, index) {
+  return `${key}__chunk_${index}`;
+}
+
+async function writeSyncStorageChunked(key, value) {
+  const encoded = encodeBase64Utf8(JSON.stringify(value));
+  const manifestKey = getChunkManifestKey(key);
+  const current = await chrome.storage.sync.get([manifestKey]);
+  const previousCount = current[manifestKey]?.count ?? 0;
+
+  if (encoded.length <= SYNC_CHUNK_SIZE) {
+    await chrome.storage.sync.set({[key]: value});
+    const removeKeys = [manifestKey, ...Array.from({length: previousCount}, (_, index) => getChunkKey(key, index))];
+    if (removeKeys.length) {
+      await chrome.storage.sync.remove(removeKeys);
+    }
+    return;
+  }
+
+  const chunks = [];
+  for (let index = 0; index < encoded.length; index += SYNC_CHUNK_SIZE) {
+    chunks.push(encoded.slice(index, index + SYNC_CHUNK_SIZE));
+  }
+
+  const payload = {
+    [manifestKey]: {
+      chunked: true,
+      count: chunks.length,
+    },
+  };
+
+  chunks.forEach((chunk, index) => {
+    payload[getChunkKey(key, index)] = chunk;
+  });
+
+  await chrome.storage.sync.remove([key]);
+  await chrome.storage.sync.set(payload);
+
+  const removeKeys = Array.from(
+    {length: Math.max(0, previousCount - chunks.length)},
+    (_, index) => getChunkKey(key, chunks.length + index),
+  );
+  if (removeKeys.length) {
+    await chrome.storage.sync.remove(removeKeys);
+  }
+}
+
+function encodeBase64Utf8(value) {
+  const bytes = new TextEncoder().encode(value);
+  let binary = "";
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary);
+}
+
+function decodeBase64Utf8(value) {
+  const binary = atob(value);
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
 }
 
 async function readLocalOnlyStorage(key) {

@@ -7,10 +7,11 @@
     <link rel="stylesheet" href="./styles.css">
   </head>
   <body>
+    <div class="wallpaper-overlay" id="wallpaperOverlay"></div>
     <div class="page-shell">
       <header class="topbar">
         <div class="topbar__actions">
-          <button class="chip-button" id="languageToggleButton" type="button" aria-label="切换语言">中 / EN</button>
+          <button class="icon-toggle" id="languageToggleButton" type="button" aria-label="切换语言">中</button>
           <button class="icon-toggle" id="themeToggleButton" type="button" aria-label="切换主题">
             <svg class="theme-icon theme-icon--sun" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path d="M12 3.75v2.1m0 12.3v2.1m8.25-8.25h-2.1M5.85 12H3.75m14.08 5.83-1.49-1.49M7.66 7.66 6.17 6.17m11.66 0-1.49 1.49M7.66 16.34l-1.49 1.49" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
@@ -29,9 +30,14 @@
             <div class="topbar-menu" id="topbarMenu" role="menu" hidden>
               <button class="topbar-menu__item" id="uploadLogoButton" type="button" role="menuitem">上传自定义 Logo</button>
               <button class="topbar-menu__item" id="clearLogoButton" type="button" role="menuitem">清除自定义 Logo</button>
+              <hr class="topbar-menu__separator">
+              <button class="topbar-menu__item" id="uploadWallpaperButton" type="button" role="menuitem">设置背景壁纸</button>
+              <button class="topbar-menu__item" id="clearWallpaperButton" type="button" role="menuitem">清除背景壁纸</button>
+              <hr class="topbar-menu__separator">
               <button class="topbar-menu__item" id="exportConfigButton" type="button" role="menuitem">导出链接配置</button>
               <button class="topbar-menu__item" id="importConfigButton" type="button" role="menuitem">导入链接配置</button>
               <button class="topbar-menu__item" id="helpButton" type="button" role="menuitem">使用帮助</button>
+              <button class="topbar-menu__item" id="aboutButton" type="button" role="menuitem">关于</button>
             </div>
           </div>
         </div>
@@ -118,9 +124,9 @@
           <div>
             <h2 class="shortcut-form__title" id="dialogTitle">添加快捷方式</h2>
           </div>
-          <button class="icon-button" id="closeDialogButton" type="button" aria-label="关闭">
-            <svg viewBox="0 0 24 24" fill="none">
-              <path d="m7.05 7.05 9.9 9.9m0-9.9-9.9 9.9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          <button class="dialog-close-button" id="closeDialogButton" type="button" aria-label="关闭">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 6L6 18M6 6l12 12"/>
             </svg>
           </button>
         </div>
@@ -163,9 +169,18 @@
           </div>
         </a>
         <div class="shortcut-card__actions">
+          <button class="icon-button" data-action="pin" type="button" aria-label="固定到顶部">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <g transform="rotate(45 12 12)">
+                <path d="M12 12v8M7 12h10M9 12V6a3 3 0 0 1 6 0v6"/>
+              </g>
+            </svg>
+          </button>
           <button class="icon-button" data-action="edit" type="button" aria-label="编辑链接">
-            <svg viewBox="0 0 24 24" fill="none">
-              <path d="M4 16.75V20h3.25L17.81 9.44l-3.25-3.25L4 16.75Zm12.85-8.9 1.96-1.96a.92.92 0 0 0 0-1.3L17.4 3.18a.92.92 0 0 0-1.3 0l-1.96 1.96 2.71 2.71Z" fill="currentColor"/>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <g transform="rotate(45 12 12)">
+                <path d="M10 2h4v14l-2 4-2-4V2z M10 6h4 M10 14h4"/>
+              </g>
             </svg>
           </button>
         </div>
@@ -175,14 +190,15 @@
     <datalist id="categorySuggestions"></datalist>
     <input id="logoUploadInput" type="file" accept="image/*" hidden>
     <input id="importConfigInput" type="file" accept="application/json" hidden>
+    <input id="wallpaperUploadInput" type="file" accept="image/*" hidden>
 
     <dialog class="help-dialog" id="helpDialog">
       <div class="help-dialog__panel">
         <div class="shortcut-form__header">
           <h2 class="shortcut-form__title" id="helpDialogTitle">使用帮助</h2>
-          <button class="icon-button" id="closeHelpDialogButton" type="button" aria-label="关闭帮助">
-            <svg viewBox="0 0 24 24" fill="none">
-              <path d="m7.05 7.05 9.9 9.9m0-9.9-9.9 9.9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          <button class="dialog-close-button" id="closeHelpDialogButton" type="button" aria-label="关闭帮助">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 6L6 18M6 6l12 12"/>
             </svg>
           </button>
         </div>
@@ -192,6 +208,53 @@
           <p>3. 左侧分类可筛选；拖动链接到分类上即可把链接加入该分类。</p>
           <p>4. 排序支持按点击频次、名称、时间和手动顺序。</p>
           <p>5. 可通过菜单导入导出配置，或上传自定义 Logo 替换主页 Google Logo。</p>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="help-dialog" id="aboutDialog">
+      <div class="help-dialog__panel about-dialog__panel">
+        <div class="shortcut-form__header">
+          <h2 class="shortcut-form__title" id="aboutDialogTitle">关于</h2>
+          <button class="dialog-close-button" id="closeAboutDialogButton" type="button" aria-label="关闭关于">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 6L6 18M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+        <div class="about-profile">
+          <a class="about-profile__avatar-link" href="https://github.com/luanyufei" target="_blank" rel="noopener noreferrer" title="访问我的 GitHub 主页">
+            <div class="about-profile__avatar-container">
+              <img class="about-profile__avatar" src="https://github.com/luanyufei.png" alt="FEEFEENOON">
+            </div>
+          </a>
+          <h3 class="about-profile__name">FEEFEENOON</h3>
+          <a class="about-profile__email" id="aboutDialogEmail" href="mailto:noonyjufee@gmail.com">noonyjufee@gmail.com</a>
+        </div>
+        <div class="about-details">
+          <div class="about-item">
+            <span class="about-item__label" id="aboutDialogAuthorLabel">作者</span>
+            <span class="about-item__value">FEEFEENOON</span>
+          </div>
+          <div class="about-item">
+            <span class="about-item__label" id="aboutDialogRepoLabel">项目地址</span>
+            <span class="about-item__value">
+              <a class="about-item__link" id="aboutDialogRepoLink" href="https://github.com/luanyufei/NOON_New_Tab" target="_blank" rel="noopener noreferrer">
+                NOON_New_Tab
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:middle;">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"/>
+                </svg>
+              </a>
+            </span>
+          </div>
+        </div>
+        <div class="about-dialog__actions">
+          <a class="about-dialog__issue-btn" id="aboutDialogIssueBtn" href="https://github.com/luanyufei/NOON_New_Tab/issues" target="_blank" rel="noopener noreferrer">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:middle; margin-right:4px;">
+              <path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            </svg>
+            <span id="aboutDialogIssueText">提 Issue</span>
+          </a>
         </div>
       </div>
     </dialog>

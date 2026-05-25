@@ -3,10 +3,14 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark light">
     <title>NOON New Tab</title>
     <link rel="stylesheet" href="./styles.css">
   </head>
   <body>
+    <div class="app-loader" id="appLoader"><div class="spinner"></div></div>
+    <input type="checkbox" id="settingsToggle" class="settings-toggle" hidden>
+    <label for="settingsToggle" class="settings-backdrop-overlay" aria-hidden="true"></label>
     <div class="wallpaper-overlay" id="wallpaperOverlay"></div>
     <div class="page-shell">
       <header class="topbar">
@@ -20,26 +24,17 @@
             <svg class="theme-icon theme-icon--moon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path d="M18.4 14.2A7.2 7.2 0 0 1 9.8 5.6a7.5 7.5 0 1 0 8.6 8.6Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
             </svg>
+            <svg class="theme-icon theme-icon--system" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <rect x="3" y="4" width="18" height="12" rx="2" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+              <path d="M12 16v4M8 20h8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            </svg>
           </button>
-          <div class="menu-wrap">
-            <button class="icon-toggle" id="manageButton" type="button" aria-label="打开功能菜单" aria-expanded="false" aria-haspopup="menu">
-              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M4 7.5h16M4 12h16M4 16.5h16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-              </svg>
-            </button>
-            <div class="topbar-menu" id="topbarMenu" role="menu" hidden>
-              <button class="topbar-menu__item" id="uploadLogoButton" type="button" role="menuitem">上传自定义 Logo</button>
-              <button class="topbar-menu__item" id="clearLogoButton" type="button" role="menuitem">清除自定义 Logo</button>
-              <hr class="topbar-menu__separator">
-              <button class="topbar-menu__item" id="uploadWallpaperButton" type="button" role="menuitem">设置背景壁纸</button>
-              <button class="topbar-menu__item" id="clearWallpaperButton" type="button" role="menuitem">清除背景壁纸</button>
-              <hr class="topbar-menu__separator">
-              <button class="topbar-menu__item" id="exportConfigButton" type="button" role="menuitem">导出链接配置</button>
-              <button class="topbar-menu__item" id="importConfigButton" type="button" role="menuitem">导入链接配置</button>
-              <button class="topbar-menu__item" id="helpButton" type="button" role="menuitem">使用帮助</button>
-              <button class="topbar-menu__item" id="aboutButton" type="button" role="menuitem">关于</button>
-            </div>
-          </div>
+          <label for="settingsToggle" id="settingsButton" class="icon-toggle" role="button" tabindex="0" aria-label="打开设置">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+          </label>
         </div>
       </header>
 
@@ -49,13 +44,76 @@
           id="googleLogo"
           src="https://www.google.com/images/branding/googlelogo/2x/googlelogo_light_color_272x92dp.png"
           alt="Google"
+          loading="lazy"
         >
         <form class="search-panel" id="searchForm">
           <label class="sr-only" for="searchInput">搜索</label>
-          <div class="search-panel__icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none">
-              <path d="M10.5 4a6.5 6.5 0 1 0 4.03 11.6l4.44 4.44 1.06-1.06-4.44-4.44A6.5 6.5 0 0 0 10.5 4Zm0 1.5a5 5 0 1 1 0 10a5 5 0 0 1 0-10Z" fill="currentColor"/>
-            </svg>
+          <div class="search-engine-selector-wrap">
+            <details class="search-engine-selector" id="searchEngineSelector">
+              <summary class="engine-trigger" aria-label="选择搜索引擎" role="button">
+                <svg class="engine-icon active-engine-icon" viewBox="0 0 24 24">
+                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22c-.81-2.6-2.57-4.53-5.01-4.53z" fill="#FBBC05"/>
+                  <path d="M12 7.6c1.62 0 3.06.56 4.21 1.66l3.15-3.15C17.45 4.18 14.97 3 12 3 7.7 3 3.99 5.47 2.18 9.13l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                </svg>
+                <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </summary>
+              <ul class="engine-dropdown-list" role="menu">
+                <li role="none">
+                  <button type="button" class="engine-option" data-engine="google" role="menuitem">
+                    <svg viewBox="0 0 24 24">
+                      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22c-.81-2.6-2.57-4.53-5.01-4.53z" fill="#FBBC05"/>
+                      <path d="M12 7.6c1.62 0 3.06.56 4.21 1.66l3.15-3.15C17.45 4.18 14.97 3 12 3 7.7 3 3.99 5.47 2.18 9.13l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                    </svg>
+                    <span>Google</span>
+                  </button>
+                </li>
+                <li role="none">
+                  <button type="button" class="engine-option" data-engine="bing" role="menuitem">
+                    <svg viewBox="0 0 24 24" fill="none">
+                      <path d="M13.4 3v12.3l4.3-2.5V8.5L13.4 3z" fill="#00809D" />
+                      <path d="M13.4 3L5.5 6.6v10.8l7.9 4.6v-6.7l-4.1-2.4v-4.1l4.1 2.4V3z" fill="#00A1F1" />
+                    </svg>
+                    <span>Bing</span>
+                  </button>
+                </li>
+                <li role="none">
+                  <button type="button" class="engine-option" data-engine="duckduckgo" role="menuitem">
+                    <svg viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" fill="#DE5833"/>
+                      <path d="M12 14.5c-1.2 0-2.2-.6-2.7-1.5h5.4c-.5.9-1.5 1.5-2.7 1.5z" fill="#FFF"/>
+                      <circle cx="9.2" cy="10.2" r="0.8" fill="#333"/>
+                      <circle cx="14.8" cy="10.2" r="0.8" fill="#333"/>
+                      <path d="M12 12c-.8 0-1.4.4-1.7.9h3.4c-.3-.5-.9-.9-1.7-.9z" fill="#FFB627"/>
+                    </svg>
+                    <span>DuckDuckGo</span>
+                  </button>
+                </li>
+                <li role="none">
+                  <button type="button" class="engine-option" data-engine="github" role="menuitem">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.464-1.11-1.464-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.579.688.481C19.137 20.162 22 16.418 22 12c0-5.523-4.477-10-10-10z"/>
+                    </svg>
+                    <span>GitHub</span>
+                  </button>
+                </li>
+                <li role="none">
+                  <button type="button" class="engine-option" data-engine="bilibili" role="menuitem">
+                    <svg viewBox="0 0 24 24" fill="none">
+                      <rect x="2" y="6" width="20" height="13" rx="3" fill="#00a1d6" />
+                      <path d="M8 6L5 2m8 4l3-4" stroke="#00a1d6" stroke-width="1.8" stroke-linecap="round" />
+                      <rect x="5" y="9" width="2.5" height="3.5" rx="1" fill="#FFF" />
+                      <rect x="16.5" y="9" width="2.5" height="3.5" rx="1" fill="#FFF" />
+                      <path d="M9 15c1.2 1.2 3.8 1.2 5 0" stroke="#FFF" stroke-width="1.5" stroke-linecap="round" />
+                    </svg>
+                    <span>Bilibili</span>
+                  </button>
+                </li>
+              </ul>
+            </details>
           </div>
           <div class="search-panel__input-wrap">
             <input id="searchInput" name="q" type="search" placeholder="在 Google 中搜索，或输入网址" autocomplete="off" spellcheck="false">
@@ -169,18 +227,11 @@
           </div>
         </a>
         <div class="shortcut-card__actions">
-          <button class="icon-button" data-action="pin" type="button" aria-label="固定到顶部">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-              <g transform="rotate(45 12 12)">
-                <path d="M12 12v8M7 12h10M9 12V6a3 3 0 0 1 6 0v6"/>
-              </g>
-            </svg>
-          </button>
           <button class="icon-button" data-action="edit" type="button" aria-label="编辑链接">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-              <g transform="rotate(45 12 12)">
-                <path d="M10 2h4v14l-2 4-2-4V2z M10 6h4 M10 14h4"/>
-              </g>
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="12" cy="5" r="2"/>
+              <circle cx="12" cy="12" r="2"/>
+              <circle cx="12" cy="19" r="2"/>
             </svg>
           </button>
         </div>
@@ -192,73 +243,404 @@
     <input id="importConfigInput" type="file" accept="application/json" hidden>
     <input id="wallpaperUploadInput" type="file" accept="image/*" hidden>
 
-    <dialog class="help-dialog" id="helpDialog">
-      <div class="help-dialog__panel">
-        <div class="shortcut-form__header">
-          <h2 class="shortcut-form__title" id="helpDialogTitle">使用帮助</h2>
-          <button class="dialog-close-button" id="closeHelpDialogButton" type="button" aria-label="关闭帮助">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M18 6L6 18M6 6l12 12"/>
-            </svg>
-          </button>
-        </div>
-        <div class="help-dialog__content" id="helpDialogContent">
-          <p>1. 使用“添加快捷方式”新增链接，可填写名称、网址和分类。</p>
-          <p>2. 分类支持直接输入，也支持用“｜”分隔中英文名称。</p>
-          <p>3. 左侧分类可筛选；拖动链接到分类上即可把链接加入该分类。</p>
-          <p>4. 排序支持按点击频次、名称、时间和手动顺序。</p>
-          <p>5. 可通过菜单导入导出配置，或上传自定义 Logo 替换主页 Google Logo。</p>
-        </div>
-      </div>
-    </dialog>
-
-    <dialog class="help-dialog" id="aboutDialog">
-      <div class="help-dialog__panel about-dialog__panel">
-        <div class="shortcut-form__header">
-          <h2 class="shortcut-form__title" id="aboutDialogTitle">关于</h2>
-          <button class="dialog-close-button" id="closeAboutDialogButton" type="button" aria-label="关闭关于">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M18 6L6 18M6 6l12 12"/>
-            </svg>
-          </button>
-        </div>
-        <div class="about-profile">
-          <a class="about-profile__avatar-link" href="https://github.com/luanyufei" target="_blank" rel="noopener noreferrer" title="访问我的 GitHub 主页">
-            <div class="about-profile__avatar-container">
-              <img class="about-profile__avatar" src="https://github.com/luanyufei.png" alt="FEEFEENOON">
+    <!-- Sonoma-style Tabbed Settings Dialog -->
+    <dialog class="settings-dialog" id="settingsDialog">
+      <input type="radio" name="settingsTab" id="tabGeneral" checked hidden>
+      <input type="radio" name="settingsTab" id="tabAppearance" hidden>
+      <input type="radio" name="settingsTab" id="tabStatistics" hidden>
+      <input type="radio" name="settingsTab" id="tabData" hidden>
+      <input type="radio" name="settingsTab" id="tabHelp" hidden>
+      <input type="radio" name="settingsTab" id="tabAbout" hidden>
+      
+      <div class="settings-container">
+        <!-- Sidebar -->
+        <aside class="settings-sidebar">
+          <div class="settings-sidebar__header">
+            <h2 class="settings-sidebar__title">设置</h2>
+            <label for="settingsToggle" class="settings-sidebar__close" role="button" aria-label="关闭">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="m15 9-6 6M9 9l6 6"/>
+              </svg>
+            </label>
+          </div>
+          
+          <div class="settings-tabs">
+            <label for="tabGeneral" class="settings-tab-btn">
+              <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+              </svg>
+              <span id="settingsTabGeneral">常规</span>
+            </label>
+            
+            <label for="tabAppearance" class="settings-tab-btn">
+              <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M12 2a7 7 0 1 0 10 10"/>
+                <path d="M12 22a7 7 0 1 0-10-10"/>
+              </svg>
+              <span id="settingsTabAppearance">外观</span>
+            </label>
+            
+            <label for="tabStatistics" class="settings-tab-btn">
+              <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="20" x2="18" y2="10"/>
+                <line x1="12" y1="20" x2="12" y2="4"/>
+                <line x1="6" y1="20" x2="6" y2="14"/>
+              </svg>
+              <span id="settingsTabStatistics">统计</span>
+            </label>
+            
+            <label for="tabData" class="settings-tab-btn">
+              <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+              </svg>
+              <span id="settingsTabData">配置与数据</span>
+            </label>
+            
+            <label for="tabHelp" class="settings-tab-btn">
+              <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01"/>
+              </svg>
+              <span id="settingsTabHelp">使用帮助</span>
+            </label>
+            
+            <label for="tabAbout" class="settings-tab-btn">
+              <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="16" x2="12" y2="12"/>
+                <line x1="12" y1="8" x2="12.01" y2="8"/>
+              </svg>
+              <span id="settingsTabAbout">关于</span>
+            </label>
+          </div>
+        </aside>
+        
+        <!-- Content Sheet -->
+        <main class="settings-content">
+          <!-- General Tab Content -->
+          <div class="settings-panel" id="panelGeneral">
+            <h3 class="settings-panel__title" id="settingsGeneralTitle">常规设置</h3>
+            <div class="settings-section">
+              <h4 class="settings-section__title" id="settingsEngineSectionTitle">搜索引擎</h4>
+              <div class="settings-card">
+                <div class="settings-row">
+                  <div class="settings-row__label">
+                    <span class="settings-row__title" id="settingsEngineRowTitle">默认搜索引擎</span>
+                    <span class="settings-row__desc" id="settingsEngineRowDesc">选择在输入非网址时使用的默认搜索服务</span>
+                  </div>
+                  <div class="settings-row__control">
+                    <select class="settings-select" id="settingsSearchEngineSelect">
+                      <option value="google">Google</option>
+                      <option value="bing">Bing</option>
+                      <option value="duckduckgo">DuckDuckGo</option>
+                      <option value="github">GitHub</option>
+                      <option value="bilibili">Bilibili</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
             </div>
-          </a>
-          <h3 class="about-profile__name">FEEFEENOON</h3>
-          <a class="about-profile__email" id="aboutDialogEmail" href="mailto:noonyjufee@gmail.com">noonyjufee@gmail.com</a>
-        </div>
-        <div class="about-details">
-          <div class="about-item">
-            <span class="about-item__label" id="aboutDialogAuthorLabel">作者</span>
-            <span class="about-item__value">FEEFEENOON</span>
+            
+            <div class="settings-section">
+              <h4 class="settings-section__title" id="settingsLanguageSectionTitle">语言与偏好</h4>
+              <div class="settings-card">
+                <div class="settings-row">
+                  <div class="settings-row__label">
+                    <span class="settings-row__title" id="settingsLanguageRowTitle">界面语言</span>
+                    <span class="settings-row__desc" id="settingsLanguageRowDesc">切换整个扩展的中英文界面语言</span>
+                  </div>
+                  <div class="settings-row__control">
+                    <button class="settings-btn-action" id="settingsLanguageBtn" type="button">
+                      切换语言
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="about-item">
-            <span class="about-item__label" id="aboutDialogRepoLabel">项目地址</span>
-            <span class="about-item__value">
-              <a class="about-item__link" id="aboutDialogRepoLink" href="https://github.com/luanyufei/NOON_New_Tab" target="_blank" rel="noopener noreferrer">
-                NOON_New_Tab
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:middle;">
-                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"/>
-                </svg>
-              </a>
-            </span>
+          
+          <!-- Appearance Tab Content -->
+          <div class="settings-panel" id="panelAppearance">
+            <h3 class="settings-panel__title" id="settingsAppearanceTitle">外观设置</h3>
+            <div class="settings-section">
+              <h4 class="settings-section__title" id="settingsLogoSectionTitle">个性化 Logo</h4>
+              <div class="settings-card">
+                <div class="settings-row">
+                  <div class="settings-row__label">
+                    <span class="settings-row__title" id="settingsLogoRowTitle">上传自定义 Logo</span>
+                    <span class="settings-row__desc" id="settingsLogoRowDesc">上传一张图片替换主页中间的 Google 标志</span>
+                  </div>
+                  <div class="settings-row__control flex-gap">
+                    <button class="settings-btn-action" id="settingsUploadLogoBtn" type="button">上传 Logo</button>
+                    <button class="settings-btn-action danger" id="settingsClearLogoBtn" type="button">清除 Logo</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="settings-section">
+              <h4 class="settings-section__title" id="settingsWallpaperSectionTitle">背景壁纸</h4>
+              <div class="settings-card">
+                <div class="settings-row">
+                  <div class="settings-row__label">
+                    <span class="settings-row__title" id="settingsWallpaperRowTitle">设置背景壁纸</span>
+                    <span class="settings-row__desc" id="settingsWallpaperRowDesc">上传图片替换标签页 of 半透明背景或毛玻璃背景</span>
+                  </div>
+                  <div class="settings-row__control flex-gap">
+                    <button class="settings-btn-action" id="settingsUploadWallpaperBtn" type="button">设置壁纸</button>
+                    <button class="settings-btn-action danger" id="settingsClearWallpaperBtn" type="button">清除壁纸</button>
+                  </div>
+                </div>
+                <hr class="settings-card__separator">
+                <div class="settings-row">
+                  <div class="settings-row__label">
+                    <span class="settings-row__title" id="settingsDailyWallpaperRowTitle">每日壁纸</span>
+                    <span class="settings-row__desc" id="settingsDailyWallpaperRowDesc">开启后每天首次打开新标签页时自动拉取并应用最新的精美壁纸</span>
+                  </div>
+                  <div class="settings-row__control">
+                    <select class="settings-select" id="settingsDailyWallpaperSelect">
+                      <option value="none">手动背景 (Manual)</option>
+                      <option value="bing">Bing 每日壁纸 (Bing Daily)</option>
+                      <option value="picsum">Picsum 随机壁纸 (Picsum Random)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-section">
+              <h4 class="settings-section__title" id="settingsThemeSectionTitle">色彩主题</h4>
+              <div class="settings-card">
+                <div class="settings-row">
+                  <div class="settings-row__label">
+                    <span class="settings-row__title" id="settingsThemeRowTitle">色彩模式偏好</span>
+                    <span class="settings-row__desc" id="settingsThemeRowDesc">让新标签页明暗色调跟随系统或手动锁定</span>
+                  </div>
+                  <div class="settings-row__control">
+                    <select class="settings-select" id="settingsThemeSelect">
+                      <option value="system">跟随系统 (System)</option>
+                      <option value="light">亮色 (Light)</option>
+                      <option value="dark">暗色 (Dark)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-        <div class="about-dialog__actions">
-          <a class="about-dialog__issue-btn" id="aboutDialogIssueBtn" href="https://github.com/luanyufei/NOON_New_Tab/issues" target="_blank" rel="noopener noreferrer">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:middle; margin-right:4px;">
-              <path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-            </svg>
-            <span id="aboutDialogIssueText">提 Issue</span>
-          </a>
-        </div>
+          
+          <!-- Statistics Tab Content -->
+          <div class="settings-panel" id="panelStatistics">
+            <h3 class="settings-panel__title" id="settingsStatisticsTitle">数据统计</h3>
+            <div class="settings-section">
+              <h4 class="settings-section__title" id="settingsStatsSummaryTitle">使用概览</h4>
+              <div class="statistics-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+                <div class="settings-card padding-large" style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 8px;">
+                  <span style="font-size: 13px; color: var(--text-secondary);" id="statsShortcutsLabel">总快捷方式</span>
+                  <strong style="font-size: 32px; font-weight: 700; color: #4f46e5;" id="statsTotalShortcuts">0</strong>
+                </div>
+                <div class="settings-card padding-large" style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 8px;">
+                  <span style="font-size: 13px; color: var(--text-secondary);" id="statsClicksLabel">总点击次数</span>
+                  <strong style="font-size: 32px; font-weight: 700; color: #10b981;" id="statsTotalClicks">0</strong>
+                </div>
+              </div>
+            </div>
+            
+            <div class="settings-section">
+              <h4 class="settings-section__title" id="settingsStatsTop5Title">最常访问 (Top 5)</h4>
+              <div class="settings-card padding-large">
+                <div id="statsTop5List" style="display: flex; flex-direction: column; gap: 8px;">
+                  <!-- Dynamically populated in script.js -->
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-section">
+              <h4 class="settings-section__title" id="settingsStatsCategoryTitle">分类点击比例</h4>
+              <div class="settings-card padding-large">
+                <div id="statsCategoryProgress" style="display: flex; flex-direction: column; gap: 12px;">
+                  <!-- Dynamically populated in script.js -->
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Data Tab Content -->
+          <div class="settings-panel" id="panelData">
+            <h3 class="settings-panel__title" id="settingsDataTitle">配置与数据</h3>
+            <div class="settings-section">
+              <h4 class="settings-section__title" id="settingsDataSectionTitle">备份与恢复</h4>
+              <div class="settings-card">
+                <div class="settings-row">
+                  <div class="settings-row__label">
+                    <span class="settings-row__title" id="settingsBackupTitle">备份配置数据</span>
+                    <span class="settings-row__desc" id="settingsBackupDesc">备份您当前的链接与分类信息，导出为 JSON 备份文件</span>
+                  </div>
+                  <div class="settings-row__control">
+                    <button class="settings-btn-action" id="settingsExportBtn" type="button">导出配置</button>
+                  </div>
+                </div>
+                <hr class="settings-card__separator">
+                <div class="settings-row">
+                  <div class="settings-row__label">
+                    <span class="settings-row__title" id="settingsRestoreTitle">恢复配置数据</span>
+                    <span class="settings-row__desc" id="settingsRestoreDesc">从以前备份 of JSON 文件中恢复您的链接与分类数据</span>
+                  </div>
+                  <div class="settings-row__control">
+                    <button class="settings-btn-action" id="settingsImportBtn" type="button">导入配置</button>
+                  </div>
+                </div>
+                <hr class="settings-card__separator">
+                <div class="settings-row">
+                  <div class="settings-row__label">
+                    <span class="settings-row__title" id="settingsResetTitle">重置所有数据</span>
+                    <span class="settings-row__desc" id="settingsResetDesc">清空所有快捷链接、分类、自定义Logo和背景壁纸并还原初始状态</span>
+                  </div>
+                  <div class="settings-row__control">
+                    <button class="settings-btn-action danger" id="settingsResetBtn" type="button">重置数据</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Help/About Tab Content -->
+          <!-- Help Tab Content -->
+          <div class="settings-panel" id="panelHelp">
+            <h3 class="settings-panel__title" id="helpDialogTitle">使用帮助</h3>
+            <div class="settings-section">
+              <div class="settings-card">
+                <div class="settings-help-content" id="helpDialogContent">
+                  <!-- JS translates/populates this container natively -->
+                  <p>1. 使用“添加快捷方式”新增链接，可填写名称、网址和分类。</p>
+                  <p>2. 分类支持直接输入，也支持用“｜”分隔中英文名称。</p>
+                  <p>3. 左侧分类可筛选；拖动链接到分类上即可把链接加入该分类。</p>
+                  <p>4. 排序支持按点击频次、名称、时间和手动顺序。</p>
+                  <p>5. 可通过菜单导入导出配置，或上传自定义 Logo 替换主页 Google Logo。</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- About Tab Content -->
+          <div class="settings-panel" id="panelAbout">
+            <h3 class="settings-panel__title" id="aboutDialogTitle">关于</h3>
+            <div class="settings-section">
+              <div class="settings-card padding-large">
+                <div class="settings-about-profile">
+                  <a class="about-profile__avatar-link" href="https://github.com/luanyufei" target="_blank" rel="noopener noreferrer" title="访问我的 GitHub 主页">
+                    <div class="about-profile__avatar-container">
+                      <img class="about-profile__avatar" src="https://github.com/luanyufei.png" alt="FEEFEENOON">
+                    </div>
+                  </a>
+                  <h3 class="about-profile__name">FEEFEENOON</h3>
+                  <a class="about-profile__email" id="aboutDialogEmail" href="mailto:noonyjufee@gmail.com">noonyjufee@gmail.com</a>
+                </div>
+                
+                <hr class="settings-card__separator">
+                
+                <div class="settings-row">
+                  <div class="settings-row__label">
+                    <span class="settings-row__title" id="aboutDialogAuthorLabel">作者</span>
+                  </div>
+                  <div class="settings-row__control text-secondary">
+                    FEEFEENOON
+                  </div>
+                </div>
+                
+                <hr class="settings-card__separator">
+                
+                <div class="settings-row">
+                  <div class="settings-row__label">
+                    <span class="settings-row__title" id="aboutDialogRepoLabel">项目地址</span>
+                  </div>
+                  <div class="settings-row__control">
+                    <a class="about-item__link" id="aboutDialogRepoLink" href="https://github.com/luanyufei/NOON_New_Tab" target="_blank" rel="noopener noreferrer">
+                      NOON_New_Tab
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:middle; margin-left:2px;">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"/>
+                      </svg>
+                    </a>
+                  </div>
+                </div>
+                
+                <hr class="settings-card__separator">
+                
+                <div class="settings-row flex-center">
+                  <a class="about-dialog__issue-btn" id="aboutDialogIssueBtn" href="https://github.com/luanyufei/NOON_New_Tab/issues" target="_blank" rel="noopener noreferrer">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:middle; margin-right:4px;">
+                      <path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    </svg>
+                    <span id="aboutDialogIssueText">提 Issue</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
       </div>
     </dialog>
 
-    <script src="./script.js"></script>
+    <!-- Custom Right-Click Context Menu -->
+    <div id="contextMenu" class="context-menu" hidden>
+      <ul class="context-menu__list" role="menu">
+        <li role="none">
+          <button type="button" class="context-menu__item" data-action="open" role="menuitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="context-icon"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"/></svg>
+            <span>在新标签页中打开</span>
+          </button>
+        </li>
+        <li role="none">
+          <button type="button" class="context-menu__item" data-action="edit" role="menuitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="context-icon"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            <span>编辑快捷方式</span>
+          </button>
+        </li>
+        <li role="none">
+          <button type="button" class="context-menu__item" data-action="pin" role="menuitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="context-icon"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <span>固定快捷方式</span>
+          </button>
+        </li>
+        <li role="none">
+          <button type="button" class="context-menu__item" data-action="copy" role="menuitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="context-icon"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            <span>复制链接</span>
+          </button>
+        </li>
+        <hr class="context-menu__separator">
+        <li role="none">
+          <button type="button" class="context-menu__item danger" data-action="delete" role="menuitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="context-icon"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+            <span>删除快捷方式</span>
+          </button>
+        </li>
+      </ul>
+    </div>
+
+    <!-- Drag-to-Delete Trash Can Overlay -->
+    <div id="trashZone" class="trash-zone">
+      <svg class="trash-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 6 5 6 21 6"/>
+        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+        <line x1="10" y1="11" x2="10" y2="17"/>
+        <line x1="14" y1="11" x2="14" y2="17"/>
+      </svg>
+      <span class="trash-label">拖动至此处删除</span>
+    </div>
+
+    <!-- Undo Toast Notification -->
+    <div id="undoToast" class="undo-toast">
+      <div class="undo-toast__content">
+        <span class="undo-toast__message">已删除快捷方式</span>
+        <button type="button" class="undo-toast__action" id="undoButton">撤销</button>
+      </div>
+    </div>
+
+
+
+    <script type="module" src="./script.js"></script>
   </body>
 </html>

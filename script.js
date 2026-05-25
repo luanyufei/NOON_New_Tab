@@ -1,198 +1,52 @@
-const STORAGE_KEY = "noon-new-tab-shortcuts";
-const CATEGORY_STORAGE_KEY = "noon-new-tab-categories-v1";
-const THEME_STORAGE_KEY = "noon-new-tab-theme-v2";
-const CUSTOM_LOGO_STORAGE_KEY = "noon-new-tab-custom-logo-v2";
-const SORT_STORAGE_KEY = "noon-new-tab-shortcut-sort-v2";
-const LANGUAGE_STORAGE_KEY = "noon-new-tab-language-v1";
-const WALLPAPER_STORAGE_KEY = "noon-new-tab-wallpaper-v1";
-const GOOGLE_SUGGEST_ENDPOINT = "https://suggestqueries.google.com/complete/search?client=firefox&hl=zh-CN&q=";
+import { state, defaultShortcuts, defaultCategoryDefinitions } from "./state.js";
+import {
+  displayCategoryName,
+  displayShortcutName,
+  normalizeLocalizedLabel,
+  looksLikeUrl,
+  normalizeUrl,
+  isProbablyValidUrl,
+  getFaviconUrl,
+  getColorForName,
+  readFileAsDataUrl,
+  ensureCategoryDefinitionsFromShortcuts,
+  mergeCategoryDefinitions,
+  matchesCategorySearch
+} from "./utils.js";
+import {
+  STORAGE_KEY,
+  CATEGORY_STORAGE_KEY,
+  THEME_STORAGE_KEY,
+  CUSTOM_LOGO_STORAGE_KEY,
+  SORT_STORAGE_KEY,
+  LANGUAGE_STORAGE_KEY,
+  WALLPAPER_STORAGE_KEY,
+  readStorage,
+  writeStorage,
+  readLocalOnlyStorage,
+  writeLocalOnlyStorage,
+  removeLocalOnlyStorage,
+  loadShortcuts,
+  saveShortcuts,
+  persistShortcuts,
+  loadCategoryDefinitions,
+  saveCategoryDefinitions,
+  persistCategoryDefinitions,
+  loadThemePreference,
+  saveThemePreference,
+  loadCustomLogo,
+  loadSortMode,
+  saveSortMode,
+  loadLanguage,
+  saveLanguage,
+  loadWallpaper,
+  persistAll,
+  getLocalFallbackKey
+} from "./storage.js";
+import { translations, t } from "./i18n.js";
+
 const GOOGLE_LOGO_LIGHT = "https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png";
 const GOOGLE_LOGO_DARK = "https://www.google.com/images/branding/googlelogo/2x/googlelogo_light_color_272x92dp.png";
-const SYNC_CHUNK_SIZE = 7000;
-
-const defaultShortcuts = [
-  {
-    id: crypto.randomUUID(),
-    name: "YouTube",
-    url: "https://www.youtube.com/",
-    categories: ["视频|Video"],
-    createdAt: Date.now() - 4000,
-    clickCount: 0,
-  },
-  {
-    id: crypto.randomUUID(),
-    name: "GitHub",
-    url: "https://github.com/",
-    categories: ["开发|Development"],
-    createdAt: Date.now() - 3000,
-    clickCount: 0,
-  },
-  {
-    id: crypto.randomUUID(),
-    name: "Gmail",
-    url: "https://mail.google.com/",
-    categories: ["办公|Work"],
-    createdAt: Date.now() - 2000,
-    clickCount: 0,
-  },
-  {
-    id: crypto.randomUUID(),
-    name: "Figma",
-    url: "https://www.figma.com/",
-    categories: ["设计|Design", "办公|Work"],
-    createdAt: Date.now() - 1000,
-    clickCount: 0,
-  },
-];
-
-const defaultCategoryDefinitions = collectCategoryDefinitions(defaultShortcuts);
-
-const translations = {
-  zh: {
-    languageButton: "EN",
-    menuUploadLogo: "上传自定义 Logo",
-    menuClearLogo: "清除自定义 Logo",
-    menuExport: "导出链接配置",
-    menuImport: "导入链接配置",
-    menuHelp: "使用帮助",
-    heroSearchPlaceholder: "在 Google 中搜索，或输入网址",
-    categoryTitle: "分类",
-    categorySearchPlaceholder: "搜索分类",
-    shortcutSearchPlaceholder: "搜索快捷方式、网址或分类",
-    allCategory: "全部",
-    sortLabel: "排序",
-    addShortcut: "添加快捷方式",
-    addShortcutTitle: "添加快捷方式",
-    editShortcutTitle: "编辑快捷方式",
-    fieldName: "名称",
-    fieldNamePlaceholder: "例如：油管｜YouTube",
-    fieldUrl: "网址",
-    fieldUrlPlaceholder: "例如：youtube.com",
-    fieldCategories: "分类",
-    fieldCategoriesPlaceholder: "例如：视频｜Video，娱乐｜Entertainment",
-    fieldCategoriesHint: "可选已有分类；直接输入可新建。多个分类可用中英文逗号分隔，用｜或 | 分隔中英文（可选）",
-    cancel: "取消",
-    save: "保存",
-    delete: "删除",
-    emptyShortcuts: "还没有快捷方式，先添加一个吧。",
-    emptyFiltered: "当前筛选条件下没有匹配的快捷方式。",
-    uncategorized: "未分类",
-    sortManual: "手动顺序",
-    sortClicks: "按频次排序",
-    sortNameAsc: "名称 A-Z",
-    sortNameDesc: "名称 Z-A",
-    sortNewest: "最近添加",
-    sortOldest: "最早添加",
-    helpTitle: "使用帮助",
-    helpItems: [
-      "1. 使用“添加快捷方式”新增链接，可填写名称、网址和分类。",
-      "2. 分类支持直接输入，也支持用“｜”分隔中英文名称。",
-      "3. 左侧分类可筛选；拖动链接到分类上即可把链接加入该分类。",
-      "4. 排序支持按点击频次、名称、时间和手动顺序。",
-      "5. 可通过菜单导入导出配置，或上传自定义 Logo 替换主页 Google Logo。",
-    ],
-    addCategoryPrompt: "输入分类名称。用｜或 | 分隔中英文（可选）",
-    invalidUrl: "请输入有效的网址",
-    importFailed: "导入失败：这个文件不是有效的链接配置。",
-    logoUploadFailed: "上传 Logo 失败，请换一张图片再试。",
-    deleteCategoryConfirm: "删除这个分类？这不会删除链接，只会移除链接上的该分类。",
-    renameCategoryPrompt: "重命名分类。用｜或 | 分隔中英文（可选）",
-    saveFailed: "保存失败。已尝试回退到本地存储，请刷新后重试。",
-    pinnedLabel: "固定",
-    pinAriaLabel: "固定到顶部",
-    unpinAriaLabel: "取消固定",
-    menuUploadWallpaper: "设置背景壁纸",
-    menuClearWallpaper: "清除背景壁纸",
-    wallpaperUploadFailed: "设置壁纸失败，请换一张图片再试。",
-    menuAbout: "关于",
-    aboutTitle: "关于",
-    aboutAuthorLabel: "作者",
-    aboutRepoLabel: "项目地址",
-    aboutIssueButton: "提 Issue",
-  },
-  en: {
-    languageButton: "中",
-    menuUploadLogo: "Upload Custom Logo",
-    menuClearLogo: "Reset Logo",
-    menuExport: "Export Shortcuts",
-    menuImport: "Import Shortcuts",
-    menuHelp: "Help",
-    heroSearchPlaceholder: "Search Google or type a URL",
-    categoryTitle: "Categories",
-    categorySearchPlaceholder: "Search categories",
-    shortcutSearchPlaceholder: "Search shortcuts, URLs, or categories",
-    allCategory: "All",
-    sortLabel: "Sort",
-    addShortcut: "Add shortcut",
-    addShortcutTitle: "Add shortcut",
-    editShortcutTitle: "Edit shortcut",
-    fieldName: "Name",
-    fieldNamePlaceholder: "Example: 油管｜YouTube",
-    fieldUrl: "URL",
-    fieldUrlPlaceholder: "Example: youtube.com",
-    fieldCategories: "Categories",
-    fieldCategoriesPlaceholder: "Example: 视频｜Video, 娱乐｜Entertainment",
-    fieldCategoriesHint: "Pick an existing category or type to create one. Separate multiple categories with Chinese or English commas. Use ｜ or | to split Chinese and English names (optional).",
-    cancel: "Cancel",
-    save: "Save",
-    delete: "Delete",
-    emptyShortcuts: "No shortcuts yet. Add one to get started.",
-    emptyFiltered: "No shortcuts match the current filters.",
-    uncategorized: "Uncategorized",
-    sortManual: "Manual order",
-    sortClicks: "By frequency",
-    sortNameAsc: "Name A-Z",
-    sortNameDesc: "Name Z-A",
-    sortNewest: "Newest first",
-    sortOldest: "Oldest first",
-    helpTitle: "Help",
-    helpItems: [
-      "1. Use “Add shortcut” to create links with a name, URL, and categories.",
-      "2. Categories can be typed directly, and “｜” can be used to split Chinese and English labels.",
-      "3. Use the left sidebar to filter; drag a shortcut onto a category to add that category.",
-      "4. Sorting supports click frequency, name, time, and manual order.",
-      "5. Use the menu to import/export data, or upload a custom logo to replace the Google logo.",
-    ],
-    addCategoryPrompt: "Enter category names. Use ｜ or | to split Chinese and English labels (optional).",
-    invalidUrl: "Please enter a valid URL",
-    importFailed: "Import failed: the file is not a valid shortcut configuration.",
-    logoUploadFailed: "Logo upload failed. Try a different image.",
-    deleteCategoryConfirm: "Delete this category? Links will be kept and only this category label will be removed.",
-    renameCategoryPrompt: "Rename category. Use ｜ or | to split Chinese and English labels (optional).",
-    saveFailed: "Save failed. Fallback local storage was attempted. Refresh and try again.",
-    pinnedLabel: "Pinned",
-    pinAriaLabel: "Pin to top",
-    unpinAriaLabel: "Unpin",
-    menuUploadWallpaper: "Set Wallpaper",
-    menuClearWallpaper: "Clear Wallpaper",
-    wallpaperUploadFailed: "Failed to set wallpaper. Try a different image.",
-    menuAbout: "About",
-    aboutTitle: "About",
-    aboutAuthorLabel: "Author",
-    aboutRepoLabel: "Repository",
-    aboutIssueButton: "Submit Issue",
-  },
-};
-
-const state = {
-  shortcuts: [],
-  categoryDefinitions: [],
-  editingId: null,
-  draggedId: null,
-  draggedElement: null,
-  didCategoryDrop: false,
-  themePreference: "system",
-  customLogo: null,
-  suggestions: [],
-  activeSuggestionIndex: -1,
-  suggestionAbortController: null,
-  selectedCategory: "all",
-  categorySearchQuery: "",
-  shortcutSearchQuery: "",
-  sortMode: "click-desc",
-  language: "zh",
-  wallpaper: null,
-};
 
 const elements = {
   searchForm: document.querySelector("#searchForm"),
@@ -217,36 +71,620 @@ const elements = {
   categoriesInput: document.querySelector("#categoriesInput"),
   categorySuggestions: document.querySelector("#categorySuggestions"),
   addShortcutButton: document.querySelector("#addShortcutButton"),
-  manageButton: document.querySelector("#manageButton"),
-  topbarMenu: document.querySelector("#topbarMenu"),
-  uploadLogoButton: document.querySelector("#uploadLogoButton"),
-  clearLogoButton: document.querySelector("#clearLogoButton"),
-  exportConfigButton: document.querySelector("#exportConfigButton"),
-  importConfigButton: document.querySelector("#importConfigButton"),
-  helpButton: document.querySelector("#helpButton"),
-  helpDialog: document.querySelector("#helpDialog"),
-  closeHelpDialogButton: document.querySelector("#closeHelpDialogButton"),
-  helpDialogTitle: document.querySelector("#helpDialogTitle"),
+  
+  // Settings dialog
+  settingsToggle: document.querySelector("#settingsToggle"),
+  settingsButton: document.querySelector("#settingsButton"),
+  settingsDialog: document.querySelector("#settingsDialog"),
+  
+  // Custom elements from index.html settings
+  settingsSearchEngineSelect: document.querySelector("#settingsSearchEngineSelect"),
+  settingsLanguageBtn: document.querySelector("#settingsLanguageBtn"),
+  settingsUploadLogoBtn: document.querySelector("#settingsUploadLogoBtn"),
+  settingsClearLogoBtn: document.querySelector("#settingsClearLogoBtn"),
+  settingsUploadWallpaperBtn: document.querySelector("#settingsUploadWallpaperBtn"),
+  settingsClearWallpaperBtn: document.querySelector("#settingsClearWallpaperBtn"),
+  settingsDailyWallpaperSelect: document.querySelector("#settingsDailyWallpaperSelect"),
+  settingsThemeSelect: document.querySelector("#settingsThemeSelect"),
+  settingsExportBtn: document.querySelector("#settingsExportBtn"),
+  settingsImportBtn: document.querySelector("#settingsImportBtn"),
+  settingsResetBtn: document.querySelector("#settingsResetBtn"),
+  
+  // Help & About
   helpDialogContent: document.querySelector("#helpDialogContent"),
+  aboutDialogEmail: document.querySelector("#aboutDialogEmail"),
+  aboutDialogRepoLink: document.querySelector("#aboutDialogRepoLink"),
+  aboutDialogIssueBtn: document.querySelector("#aboutDialogIssueBtn"),
+
+  // Context menu, Trash zone, Undo toast
+  contextMenu: document.querySelector("#contextMenu"),
+  trashZone: document.querySelector("#trashZone"),
+  undoToast: document.querySelector("#undoToast"),
+  undoButton: document.querySelector("#undoButton"),
+  
+  // Other inputs
   logoUploadInput: document.querySelector("#logoUploadInput"),
   importConfigInput: document.querySelector("#importConfigInput"),
+  wallpaperUploadInput: document.querySelector("#wallpaperUploadInput"),
   closeDialogButton: document.querySelector("#closeDialogButton"),
   cancelButton: document.querySelector("#cancelButton"),
   deleteShortcutButton: document.querySelector("#deleteShortcutButton"),
   themeToggleButton: document.querySelector("#themeToggleButton"),
   wallpaperOverlay: document.querySelector("#wallpaperOverlay"),
-  wallpaperUploadInput: document.querySelector("#wallpaperUploadInput"),
-  uploadWallpaperButton: document.querySelector("#uploadWallpaperButton"),
-  clearWallpaperButton: document.querySelector("#clearWallpaperButton"),
-  aboutButton: document.querySelector("#aboutButton"),
-  aboutDialog: document.querySelector("#aboutDialog"),
-  closeAboutDialogButton: document.querySelector("#closeAboutDialogButton"),
-  aboutDialogTitle: document.querySelector("#aboutDialogTitle"),
-  aboutDialogAuthorLabel: document.querySelector("#aboutDialogAuthorLabel"),
-  aboutDialogRepoLabel: document.querySelector("#aboutDialogRepoLabel"),
 };
 
+// Reference the static app loader spinner in the HTML
+const appLoader = document.getElementById("appLoader");
+const isDarkDefault = window.matchMedia("(prefers-color-scheme: dark)").matches;
+
+// Settings, context menus, and trash zone references
+let selectedEngineId = "google";
+let contextMenu = null;
+let trashZone = null;
+let toastTimeout = null;
+
+function initializeEnhancements() {
+  // Bind search engine selector options in the search box
+  const engineOptions = document.querySelectorAll(".engine-option");
+  engineOptions.forEach(btn => {
+    btn.addEventListener("click", () => {
+      const engineId = btn.dataset.engine;
+      selectedEngineId = engineId;
+      localStorage.setItem("noon-new-tab-search-engine-v1", engineId);
+      
+      // Close details dropdown
+      const selector = document.getElementById("searchEngineSelector");
+      if (selector) {
+        selector.removeAttribute("open");
+      }
+      
+      // Sync to Settings select
+      if (elements.settingsSearchEngineSelect) {
+        elements.settingsSearchEngineSelect.value = engineId;
+      }
+      
+      syncSearchEngineUI(engineId);
+      updateSearchPlaceholder();
+    });
+  });
+
+  // Sync initial search engine UI from local storage
+  selectedEngineId = localStorage.getItem("noon-new-tab-search-engine-v1") || "google";
+  syncSearchEngineUI(selectedEngineId);
+  updateSearchPlaceholder();
+
+  // Settings select sync
+  if (elements.settingsSearchEngineSelect) {
+    elements.settingsSearchEngineSelect.value = selectedEngineId;
+    elements.settingsSearchEngineSelect.addEventListener("change", (e) => {
+      const engineId = e.target.value;
+      selectedEngineId = engineId;
+      localStorage.setItem("noon-new-tab-search-engine-v1", engineId);
+      syncSearchEngineUI(engineId);
+      updateSearchPlaceholder();
+    });
+  }
+
+  // Theme select sync
+  if (elements.settingsThemeSelect) {
+    elements.settingsThemeSelect.value = state.themePreference;
+    elements.settingsThemeSelect.addEventListener("change", (e) => {
+      state.themePreference = e.target.value;
+      applyTheme(state.themePreference);
+      void saveThemePreference(state.themePreference);
+    });
+  }
+
+  // Language buttons and syncs
+  if (elements.settingsLanguageBtn) {
+    elements.settingsLanguageBtn.addEventListener("click", () => {
+      handleToggleLanguage();
+    });
+  }
+
+  // Wallpaper control bindings
+  if (elements.settingsUploadWallpaperBtn) {
+    elements.settingsUploadWallpaperBtn.addEventListener("click", () => {
+      elements.wallpaperUploadInput.click();
+    });
+  }
+  if (elements.settingsClearWallpaperBtn) {
+    elements.settingsClearWallpaperBtn.addEventListener("click", () => {
+      void clearWallpaper();
+    });
+  }
+  if (elements.settingsDailyWallpaperSelect) {
+    elements.settingsDailyWallpaperSelect.value = localStorage.getItem("noon-new-tab-daily-wallpaper-type-v1") || "none";
+    elements.settingsDailyWallpaperSelect.addEventListener("change", (e) => {
+      localStorage.setItem("noon-new-tab-daily-wallpaper-type-v1", e.target.value);
+      applyWallpaper();
+    });
+  }
+
+  // Logo control bindings
+  if (elements.settingsUploadLogoBtn) {
+    elements.settingsUploadLogoBtn.addEventListener("click", () => {
+      elements.logoUploadInput.click();
+    });
+  }
+  if (elements.settingsClearLogoBtn) {
+    elements.settingsClearLogoBtn.addEventListener("click", () => {
+      void clearCustomLogo();
+    });
+  }
+
+  // Config management bindings
+  if (elements.settingsExportBtn) {
+    elements.settingsExportBtn.addEventListener("click", () => {
+      exportConfig();
+    });
+  }
+  if (elements.settingsImportBtn) {
+    elements.settingsImportBtn.addEventListener("click", () => {
+      triggerImportConfig();
+    });
+  }
+  if (elements.settingsResetBtn) {
+    elements.settingsResetBtn.addEventListener("click", async () => {
+      const isEn = state.language === "en";
+      const confirmMsg = isEn 
+        ? "Are you sure you want to reset all configurations? This will wipe out all shortcuts and custom logo/wallpaper."
+        : "确定要重置所有配置吗？这将清除所有快捷方式、自定义Logo和背景壁纸。";
+      if (window.confirm(confirmMsg)) {
+        localStorage.removeItem(getLocalFallbackKey(STORAGE_KEY));
+        localStorage.removeItem(getLocalFallbackKey(CATEGORY_STORAGE_KEY));
+        localStorage.removeItem(getLocalFallbackKey(THEME_STORAGE_KEY));
+        localStorage.removeItem(getLocalFallbackKey(SORT_STORAGE_KEY));
+        localStorage.removeItem(getLocalFallbackKey(LANGUAGE_STORAGE_KEY));
+        localStorage.removeItem(WALLPAPER_STORAGE_KEY);
+        localStorage.removeItem(CUSTOM_LOGO_STORAGE_KEY);
+        localStorage.removeItem("noon-new-tab-search-engine-v1");
+        localStorage.removeItem("noon-new-tab-daily-wallpaper-type-v1");
+        localStorage.removeItem("noon-new-tab-daily-wallpaper-cached-v1");
+        localStorage.removeItem("noon-new-tab-daily-wallpaper-cached-date-v1");
+        localStorage.removeItem("noon-new-tab-daily-wallpaper-cached-type-v1");
+        if (typeof chrome !== "undefined" && chrome.storage?.sync) {
+          try {
+            await chrome.storage.sync.clear();
+          } catch (e) {}
+        }
+        window.location.reload();
+      }
+    });
+  }
+
+  // Settings tab click updates for Statistics panel
+  const tabLabels = document.querySelectorAll(".settings-tab-btn");
+  tabLabels.forEach(label => {
+    label.addEventListener("click", () => {
+      const tabTarget = label.getAttribute("for");
+      if (tabTarget === "tabStatistics") {
+        updateStatisticsPanel();
+      }
+    });
+  });
+
+  // Settings dialog backdrops and close
+  const settingsBackdrop = document.querySelector(".settings-backdrop-overlay");
+  if (settingsBackdrop) {
+    settingsBackdrop.addEventListener("click", () => {
+      if (elements.settingsToggle) {
+        elements.settingsToggle.checked = false;
+      }
+    });
+  }
+
+  const settingsDialog = document.getElementById("settingsDialog");
+  if (settingsDialog) {
+    settingsDialog.addEventListener("click", (event) => {
+      const rect = settingsDialog.getBoundingClientRect();
+      const isClickOutside =
+        event.target === settingsDialog &&
+        (event.clientX < rect.left ||
+          event.clientX > rect.right ||
+          event.clientY < rect.top ||
+          event.clientY > rect.bottom);
+      if (isClickOutside) {
+        if (elements.settingsToggle) {
+          elements.settingsToggle.checked = false;
+        }
+      }
+    });
+  }
+
+  // Bind right-click Context Menu
+  contextMenu = elements.contextMenu;
+  document.addEventListener("click", () => {
+    if (contextMenu) {
+      contextMenu.hidden = true;
+    }
+  });
+
+  // Bind drag-to-delete Trash Zone
+  trashZone = elements.trashZone;
+  if (trashZone) {
+    trashZone.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      trashZone.classList.add("is-active");
+    });
+
+    trashZone.addEventListener("dragleave", () => {
+      trashZone.classList.remove("is-active");
+    });
+
+    trashZone.addEventListener("drop", async (event) => {
+      event.preventDefault();
+      trashZone.classList.remove("is-active");
+
+      const id = event.dataTransfer.getData("text/plain") || state.draggedId;
+      if (!id) return;
+      
+      const shortcut = state.shortcuts.find(s => s.id === id);
+      if (!shortcut) return;
+
+      await deleteShortcutWithUndo(shortcut);
+    });
+  }
+
+  // Bind Undo button inside Undo Toast
+  if (elements.undoButton) {
+    elements.undoButton.addEventListener("click", async () => {
+      if (state.lastDeletedShortcut) {
+        state.shortcuts = [...state.shortcuts, state.lastDeletedShortcut];
+        await persistShortcuts();
+        syncSelectedCategory();
+        renderCategories();
+        renderShortcuts();
+        state.lastDeletedShortcut = null;
+      }
+      if (elements.undoToast) {
+        elements.undoToast.classList.remove("is-visible");
+      }
+    });
+  }
+}
+
+function syncSearchEngineUI(engineId) {
+  const optionBtn = document.querySelector(`.engine-option[data-engine="${engineId}"]`);
+  if (optionBtn) {
+    const svgIcon = optionBtn.querySelector("svg");
+    if (svgIcon) {
+      const summaryTrigger = document.querySelector("#searchEngineSelector summary.engine-trigger");
+      if (summaryTrigger) {
+        const oldActiveIcon = summaryTrigger.querySelector(".active-engine-icon");
+        if (oldActiveIcon) {
+          const newActiveIcon = svgIcon.cloneNode(true);
+          newActiveIcon.setAttribute("class", "engine-icon active-engine-icon");
+          oldActiveIcon.replaceWith(newActiveIcon);
+        }
+      }
+    }
+  }
+}
+
+function updateSearchPlaceholder() {
+  const placeholders = {
+    zh: {
+      google: "在 Google 中搜索，或输入网址",
+      bing: "在 Bing 中搜索，或输入网址",
+      duckduckgo: "在 DuckDuckGo 中搜索，或输入网址",
+      github: "在 GitHub 中搜索，或输入网址",
+      bilibili: "在 Bilibili 中搜索，或输入网址"
+    },
+    en: {
+      google: "Search Google or type a URL",
+      bing: "Search Bing or type a URL",
+      duckduckgo: "Search DuckDuckGo or type a URL",
+      github: "Search GitHub or type a URL",
+      bilibili: "Search Bilibili or type a URL"
+    }
+  };
+  const lang = state.language === "en" ? "en" : "zh";
+  const ph = placeholders[lang][selectedEngineId] || placeholders[lang]["google"];
+  elements.searchInput.placeholder = ph;
+}
+
+function applySettingsDialogLanguage() {
+  const elementsToTranslate = [
+    "settingsTabGeneral",
+    "settingsTabAppearance",
+    "settingsTabStatistics",
+    "settingsTabData",
+    "settingsTabHelp",
+    "settingsTabAbout",
+    "settingsGeneralTitle",
+    "settingsEngineSectionTitle",
+    "settingsEngineRowTitle",
+    "settingsEngineRowDesc",
+    "settingsLanguageSectionTitle",
+    "settingsLanguageRowTitle",
+    "settingsLanguageRowDesc",
+    "settingsLanguageBtn",
+    "settingsAppearanceTitle",
+    "settingsLogoSectionTitle",
+    "settingsLogoRowTitle",
+    "settingsLogoRowDesc",
+    "settingsUploadLogoBtn",
+    "settingsClearLogoBtn",
+    "settingsWallpaperSectionTitle",
+    "settingsWallpaperRowTitle",
+    "settingsWallpaperRowDesc",
+    "settingsUploadWallpaperBtn",
+    "settingsClearWallpaperBtn",
+    "settingsDailyWallpaperRowTitle",
+    "settingsDailyWallpaperRowDesc",
+    "settingsThemeSectionTitle",
+    "settingsThemeRowTitle",
+    "settingsThemeRowDesc",
+    "settingsStatisticsTitle",
+    "settingsDataTitle",
+    "settingsDataSectionTitle",
+    "settingsBackupTitle",
+    "settingsBackupDesc",
+    "settingsExportBtn",
+    "settingsRestoreTitle",
+    "settingsRestoreDesc",
+    "settingsImportBtn",
+    "settingsResetTitle",
+    "settingsResetDesc",
+    "settingsResetBtn",
+    "helpDialogTitle",
+    "aboutDialogTitle",
+    "aboutDialogAuthorLabel",
+    "aboutDialogRepoLabel",
+    "aboutDialogIssueText",
+    "settingsStatsSummaryTitle",
+    "statsShortcutsLabel",
+    "statsClicksLabel",
+    "settingsStatsTop5Title",
+    "settingsStatsCategoryTitle"
+  ];
+  
+  elementsToTranslate.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.textContent = t(id);
+    }
+  });
+}
+
+function updateStatisticsPanel() {
+  const totalShortcuts = state.shortcuts.length;
+  const totalClicks = state.shortcuts.reduce((sum, s) => sum + (s.clickCount || 0), 0);
+  
+  const statsTotalShortcutsEl = document.getElementById("statsTotalShortcuts");
+  const statsTotalClicksEl = document.getElementById("statsTotalClicks");
+  if (statsTotalShortcutsEl) statsTotalShortcutsEl.textContent = totalShortcuts;
+  if (statsTotalClicksEl) statsTotalClicksEl.textContent = totalClicks;
+
+  // Render Top 5 List
+  const top5List = document.getElementById("statsTop5List");
+  if (top5List) {
+    top5List.innerHTML = "";
+    if (totalShortcuts === 0) {
+      top5List.innerHTML = `<div class="statistics-placeholder"><span>${state.language === "en" ? "No shortcuts" : "暂无快捷方式"}</span></div>`;
+    } else {
+      const sortedByClicks = [...state.shortcuts].sort((a, b) => (b.clickCount || 0) - (a.clickCount || 0));
+      sortedByClicks.slice(0, 5).forEach((s, idx) => {
+        const item = document.createElement("div");
+        item.className = "stats-row-item";
+        item.style.cssText = `
+          display: flex;
+          justify-content: space-between;
+          font-size: 13px;
+          padding: 8px 12px;
+          background: rgba(0, 0, 0, 0.03);
+          border-radius: 6px;
+          margin-bottom: 6px;
+        `;
+        item.innerHTML = `
+          <span>${idx + 1}. <strong>${displayShortcutName(s.name)}</strong> (${s.url.length > 30 ? s.url.slice(0, 27) + '...' : s.url})</span>
+          <span style="font-weight: 600;">${s.clickCount || 0} ${state.language === "en" ? "clicks" : "次点击"}</span>
+        `;
+        top5List.appendChild(item);
+      });
+    }
+  }
+
+  // Category progress rendering
+  const categoryProgress = document.getElementById("statsCategoryProgress");
+  if (categoryProgress) {
+    categoryProgress.innerHTML = "";
+    
+    const categoryClicks = {};
+    state.shortcuts.forEach(s => {
+      s.categories.forEach(cat => {
+        categoryClicks[cat] = (categoryClicks[cat] || 0) + (s.clickCount || 0);
+      });
+    });
+
+    const categories = Object.keys(categoryClicks);
+    if (categories.length === 0 || totalClicks === 0) {
+      categoryProgress.innerHTML = `<div class="statistics-placeholder"><span>${state.language === "en" ? "No category statistics available" : "暂无分类统计数据"}</span></div>`;
+    } else {
+      categories.forEach(cat => {
+        const clicks = categoryClicks[cat];
+        const percentage = totalClicks > 0 ? Math.round((clicks / totalClicks) * 100) : 0;
+        
+        const wrap = document.createElement("div");
+        wrap.style.cssText = `
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          font-size: 13px;
+          margin-bottom: 10px;
+        `;
+        wrap.innerHTML = `
+          <div style="display: flex; justify-content: space-between;">
+            <span>${displayCategoryName(cat)}</span>
+            <strong>${percentage}% (${clicks} ${state.language === "en" ? "clicks" : "次"})</strong>
+          </div>
+          <div style="width: 100%; height: 8px; background-color: rgba(0, 0, 0, 0.05); border-radius: 4px; overflow: hidden;">
+            <div style="width: ${percentage}%; height: 100%; background-color: #4f46e5; border-radius: 4px;"></div>
+          </div>
+        `;
+        categoryProgress.appendChild(wrap);
+      });
+    }
+  }
+}
+
+function showContextMenu(event, shortcut) {
+  if (!contextMenu) return;
+
+  const isEn = state.language === "en";
+  const pinText = shortcut.pinned 
+    ? (isEn ? "Unpin Shortcut" : "取消固定快捷方式") 
+    : (isEn ? "Pin Shortcut" : "固定快捷方式");
+
+  const openBtn = contextMenu.querySelector('[data-action="open"] span');
+  const editBtn = contextMenu.querySelector('[data-action="edit"] span');
+  const pinBtn = contextMenu.querySelector('[data-action="pin"] span');
+  const deleteBtn = contextMenu.querySelector('[data-action="delete"] span');
+  const copyBtn = contextMenu.querySelector('[data-action="copy"] span');
+
+  if (openBtn) openBtn.textContent = isEn ? "Open in New Tab" : "在新标签页中打开";
+  if (editBtn) editBtn.textContent = isEn ? "Edit Shortcut" : "编辑快捷方式";
+  if (pinBtn) pinBtn.textContent = pinText;
+  if (deleteBtn) deleteBtn.textContent = isEn ? "Delete Shortcut" : "删除快捷方式";
+  if (copyBtn) copyBtn.textContent = isEn ? "Copy Link" : "复制链接";
+
+  // Re-bind click actions
+  const newContextMenu = contextMenu.cloneNode(true);
+  contextMenu.replaceWith(newContextMenu);
+  contextMenu = newContextMenu;
+  
+  const newItems = contextMenu.querySelectorAll(".context-menu__item");
+  newItems.forEach(item => {
+    item.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const action = item.dataset.action;
+      contextMenu.hidden = true;
+      
+      if (action === "open") {
+        await recordShortcutClick(shortcut.id);
+        window.open(shortcut.url, "_blank");
+      } else if (action === "edit") {
+        openDialog(shortcut.id);
+      } else if (action === "delete") {
+        await deleteShortcutWithUndo(shortcut);
+      } else if (action === "pin") {
+        await togglePin(shortcut.id);
+      } else if (action === "copy") {
+        try {
+          await navigator.clipboard.writeText(shortcut.url);
+          showToast(isEn ? "Link copied!" : "链接已复制！");
+        } catch (err) {
+          console.error("Failed to copy link", err);
+        }
+      }
+    });
+  });
+
+  contextMenu.style.left = `${event.clientX}px`;
+  contextMenu.style.top = `${event.clientY}px`;
+  contextMenu.hidden = false;
+  
+  const rect = contextMenu.getBoundingClientRect();
+  if (rect.right > window.innerWidth) {
+    contextMenu.style.left = `${window.innerWidth - rect.width - 8}px`;
+  }
+  if (rect.bottom > window.innerHeight) {
+    contextMenu.style.top = `${window.innerHeight - rect.height - 8}px`;
+  }
+}
+
+async function deleteShortcutWithUndo(shortcut) {
+  const isEn = state.language === "en";
+  const confirmMsg = isEn 
+    ? `Are you sure you want to delete "${displayShortcutName(shortcut.name)}"?`
+    : `确定要删除快捷方式 "${displayShortcutName(shortcut.name)}" 吗？`;
+    
+  if (window.confirm(confirmMsg)) {
+    state.lastDeletedShortcut = shortcut;
+    state.shortcuts = state.shortcuts.filter(s => s.id !== shortcut.id);
+    await persistShortcuts();
+    syncSelectedCategory();
+    renderCategories();
+    renderShortcuts();
+    
+    showToast(
+      isEn ? `Deleted "${displayShortcutName(shortcut.name)}"` : `已删除 "${displayShortcutName(shortcut.name)}"`,
+      true
+    );
+  }
+}
+
+function showToast(message, showUndo = false) {
+  if (toastTimeout) {
+    clearTimeout(toastTimeout);
+  }
+
+  const toastMessageEl = elements.undoToast.querySelector(".undo-toast__message");
+  if (toastMessageEl) {
+    toastMessageEl.textContent = message;
+  }
+  
+  if (elements.undoButton) {
+    elements.undoButton.style.display = showUndo ? "inline-block" : "none";
+    elements.undoButton.textContent = state.language === "en" ? "Undo" : "撤销";
+  }
+
+  elements.undoToast.classList.add("is-visible");
+
+  toastTimeout = setTimeout(() => {
+    elements.undoToast.classList.remove("is-visible");
+  }, 4000);
+}
+
+// Daily Wallpaper asynchronous cache
+async function fetchAndCacheDailyWallpaper() {
+  const dailyType = localStorage.getItem("noon-new-tab-daily-wallpaper-type-v1") || "none";
+  if (dailyType === "none") return;
+  
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const cachedDate = localStorage.getItem("noon-new-tab-daily-wallpaper-cached-date-v1");
+  const cachedData = localStorage.getItem("noon-new-tab-daily-wallpaper-cached-v1");
+  const cachedType = localStorage.getItem("noon-new-tab-daily-wallpaper-cached-type-v1");
+
+  if (cachedDate === todayStr && cachedData && cachedType === dailyType) {
+    return;
+  }
+
+  let url = "";
+  if (dailyType === "bing") {
+    url = "https://api.dujin.org/bing/1920.php"; 
+  } else if (dailyType === "picsum") {
+    url = `https://picsum.photos/1920/1080?sig=${todayStr}`;
+  }
+
+  if (!url) return;
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("Fetch failed");
+    const blob = await res.blob();
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64data = reader.result;
+      localStorage.setItem("noon-new-tab-daily-wallpaper-cached-v1", base64data);
+      localStorage.setItem("noon-new-tab-daily-wallpaper-cached-date-v1", todayStr);
+      localStorage.setItem("noon-new-tab-daily-wallpaper-cached-type-v1", dailyType);
+      
+      // Update background with cached base64 wallpaper
+      document.body.classList.add("has-wallpaper");
+      elements.wallpaperOverlay.style.backgroundImage = `url(${base64data})`;
+      elements.wallpaperOverlay.hidden = false;
+    };
+    reader.readAsDataURL(blob);
+  } catch (e) {
+    console.error("Failed to fetch daily wallpaper asynchronously", e);
+  }
+}
+
+// Hydrate, apply preferences, and fade out appLoader spinner
 hydrate().then(() => {
+  initializeEnhancements();
   applyTheme(state.themePreference);
   applyWallpaper();
   applyLanguage();
@@ -254,6 +692,14 @@ hydrate().then(() => {
   renderCategories();
   renderShortcuts();
   bindEvents();
+  
+  // Fade out dynamic loader spinner
+  if (appLoader) {
+    appLoader.style.opacity = "0";
+    setTimeout(() => {
+      appLoader.style.display = "none";
+    }, 500);
+  }
 });
 
 async function hydrate() {
@@ -277,22 +723,17 @@ function bindEvents() {
   elements.categorySearchInput.addEventListener("input", handleCategorySearchInput);
   elements.shortcutSearchInput.addEventListener("input", handleShortcutSearchInput);
   elements.sortSelect.addEventListener("change", handleSortChange);
-  elements.languageToggleButton.addEventListener("click", toggleLanguage);
+  elements.languageToggleButton.addEventListener("click", handleToggleLanguage);
   document.addEventListener("click", handleDocumentClick);
   elements.addShortcutButton.addEventListener("click", () => openDialog());
   elements.addCategoryButton.addEventListener("click", createCategoriesFromPrompt);
-  elements.manageButton.addEventListener("click", toggleTopbarMenu);
-  elements.uploadLogoButton.addEventListener("click", triggerLogoUpload);
-  elements.clearLogoButton.addEventListener("click", clearCustomLogo);
-  elements.exportConfigButton.addEventListener("click", exportConfig);
-  elements.importConfigButton.addEventListener("click", triggerImportConfig);
-  elements.helpButton.addEventListener("click", openHelpDialog);
-  elements.closeHelpDialogButton.addEventListener("click", closeHelpDialog);
+  
+  // File upload inputs
   elements.logoUploadInput.addEventListener("change", handleLogoUpload);
   elements.importConfigInput.addEventListener("change", handleImportConfig);
   elements.wallpaperUploadInput.addEventListener("change", handleWallpaperUpload);
-  elements.uploadWallpaperButton.addEventListener("click", triggerWallpaperUpload);
-  elements.clearWallpaperButton.addEventListener("click", clearWallpaper);
+  
+  // Shortcut Dialog events
   elements.closeDialogButton.addEventListener("click", closeDialog);
   elements.cancelButton.addEventListener("click", closeDialog);
   elements.deleteShortcutButton.addEventListener("click", deleteCurrentShortcut);
@@ -301,10 +742,6 @@ function bindEvents() {
   elements.form.addEventListener("keydown", handleShortcutFormKeydown);
   colorSchemeQuery.addEventListener("change", handleSystemThemeChange);
   elements.dialog.addEventListener("click", handleDialogBackdropClick);
-  elements.helpDialog.addEventListener("click", handleHelpDialogBackdropClick);
-  elements.aboutButton.addEventListener("click", openAboutDialog);
-  elements.closeAboutDialogButton.addEventListener("click", closeAboutDialog);
-  elements.aboutDialog.addEventListener("click", handleAboutDialogBackdropClick);
 }
 
 function handleDialogBackdropClick(event) {
@@ -319,45 +756,18 @@ function handleDialogBackdropClick(event) {
   }
 }
 
-function handleHelpDialogBackdropClick(event) {
-  const dialogBox = elements.helpDialog.querySelector(".help-dialog__panel").getBoundingClientRect();
-  const isBackdropClick =
-    event.clientX < dialogBox.left ||
-    event.clientX > dialogBox.right ||
-    event.clientY < dialogBox.top ||
-    event.clientY > dialogBox.bottom;
-  if (isBackdropClick) {
-    closeHelpDialog();
-  }
-}
-
-function handleAboutDialogBackdropClick(event) {
-  const dialogBox = elements.aboutDialog.querySelector(".help-dialog__panel").getBoundingClientRect();
-  const isBackdropClick =
-    event.clientX < dialogBox.left ||
-    event.clientX > dialogBox.right ||
-    event.clientY < dialogBox.top ||
-    event.clientY > dialogBox.bottom;
-  if (isBackdropClick) {
-    closeAboutDialog();
-  }
-}
-
-function t(key) {
-  return translations[state.language][key];
-}
-
 function applyLanguage() {
   document.documentElement.lang = state.language === "en" ? "en" : "zh-CN";
   elements.languageToggleButton.textContent = t("languageButton");
-  elements.uploadLogoButton.textContent = t("menuUploadLogo");
-  elements.clearLogoButton.textContent = t("menuClearLogo");
-  elements.uploadWallpaperButton.textContent = t("menuUploadWallpaper");
-  elements.clearWallpaperButton.textContent = t("menuClearWallpaper");
-  elements.exportConfigButton.textContent = t("menuExport");
-  elements.importConfigButton.textContent = t("menuImport");
-  elements.helpButton.textContent = t("menuHelp");
-  elements.searchInput.placeholder = t("heroSearchPlaceholder");
+  
+  const settingsBtn = document.getElementById("settingsMenuButton");
+  if (settingsBtn) {
+    settingsBtn.textContent = state.language === "en" ? "Settings" : "偏好设置";
+  }
+
+  updateSearchPlaceholder();
+  applySettingsDialogLanguage();
+
   document.querySelector("#categorySidebarTitle").textContent = t("categoryTitle");
   elements.categorySearchInput.placeholder = t("categorySearchPlaceholder");
   elements.shortcutSearchInput.placeholder = t("shortcutSearchPlaceholder");
@@ -377,12 +787,7 @@ function applyLanguage() {
   elements.cancelButton.textContent = t("cancel");
   elements.deleteShortcutButton.textContent = t("delete");
   elements.form.querySelector('.secondary-button[type="submit"]').textContent = t("save");
-  elements.helpDialogTitle.textContent = t("helpTitle");
-  elements.aboutButton.textContent = t("menuAbout");
-  elements.aboutDialogTitle.textContent = t("aboutTitle");
-  elements.aboutDialogAuthorLabel.textContent = t("aboutAuthorLabel");
-  elements.aboutDialogRepoLabel.textContent = t("aboutRepoLabel");
-  document.querySelector("#aboutDialogIssueText").textContent = t("aboutIssueButton");
+  
   renderHelpContent();
   applySortOptionLabels();
   updateDialogTitle();
@@ -422,7 +827,7 @@ function updateDialogTitle() {
   elements.dialogTitle.textContent = shortcut ? t("editShortcutTitle") : t("addShortcutTitle");
 }
 
-function toggleLanguage() {
+function handleToggleLanguage() {
   state.language = state.language === "zh" ? "en" : "zh";
   void saveLanguage(state.language);
   applyLanguage();
@@ -445,28 +850,53 @@ function handleSortChange(event) {
   renderShortcuts();
 }
 
+// Theme 3-state Cycle and Persistent storage under THEME_STORAGE_KEY
 function toggleTheme() {
-  const nextTheme = resolveTheme(state.themePreference) === "light" ? "dark" : "light";
-  state.themePreference = nextTheme;
-  applyTheme(nextTheme);
-  void saveThemePreference(nextTheme);
+  let nextPref = "system";
+  if (state.themePreference === "system") {
+    nextPref = "light";
+  } else if (state.themePreference === "light") {
+    nextPref = "dark";
+  } else {
+    nextPref = "system";
+  }
+  state.themePreference = nextPref;
+  applyTheme(nextPref);
+  void saveThemePreference(nextPref);
 }
 
 function applyTheme(preference) {
   const theme = resolveTheme(preference);
   document.body.dataset.theme = theme;
+  document.body.dataset.themePref = preference;
   elements.googleLogo.src = state.customLogo || (theme === "light" ? GOOGLE_LOGO_LIGHT : GOOGLE_LOGO_DARK);
+  
+  if (elements.themeToggleButton) {
+    if (preference === "system") {
+      elements.themeToggleButton.innerHTML = `
+        <svg class="theme-icon theme-icon--system" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="width:20px; height:20px;">
+          <rect x="3" y="3" width="18" height="12" rx="2" stroke="currentColor" stroke-width="1.6" />
+          <path d="M7 21h10M12 15v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+        </svg>
+      `;
+    } else if (preference === "light") {
+      elements.themeToggleButton.innerHTML = `
+        <svg class="theme-icon theme-icon--sun" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="width:20px; height:20px;">
+          <path d="M12 3.75v2.1m0 12.3v2.1m8.25-8.25h-2.1M5.85 12H3.75m14.08 5.83-1.49-1.49M7.66 7.66 6.17 6.17m11.66 0-1.49 1.49M7.66 16.34l-1.49 1.49" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          <circle cx="12" cy="12" r="3.7" stroke="currentColor" stroke-width="1.6"/>
+        </svg>
+      `;
+    } else {
+      elements.themeToggleButton.innerHTML = `
+        <svg class="theme-icon theme-icon--moon" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="width:20px; height:20px;">
+          <path d="M18.4 14.2A7.2 7.2 0 0 1 9.8 5.6a7.5 7.5 0 1 0 8.6 8.6Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+        </svg>
+      `;
+    }
+  }
 }
 
 function resolveTheme(preference) {
-  if (
-    preference &&
-    typeof preference === "object" &&
-    preference.mode === "manual" &&
-    (preference.theme === "light" || preference.theme === "dark")
-  ) {
-    return preference.theme;
-  }
   if (preference === "light" || preference === "dark") {
     return preference;
   }
@@ -475,10 +905,14 @@ function resolveTheme(preference) {
 
 function handleSystemThemeChange() {
   state.themePreference = "system";
-  sessionStorage.removeItem("noon-new-tab-session-theme");
+  void saveThemePreference("system");
+  if (elements.settingsThemeSelect) {
+    elements.settingsThemeSelect.value = "system";
+  }
   applyTheme("system");
 }
 
+// Search form submit with routing support
 function handleSearchSubmit(event) {
   event.preventDefault();
   const rawValue = elements.searchInput.value.trim();
@@ -487,11 +921,22 @@ function handleSearchSubmit(event) {
     return;
   }
 
-  const destination = looksLikeUrl(rawValue)
-    ? normalizeUrl(rawValue, true)
-    : `https://www.google.com/search?q=${encodeURIComponent(rawValue)}`;
+  if (looksLikeUrl(rawValue)) {
+    window.location.href = normalizeUrl(rawValue, true);
+    return;
+  }
 
-  window.location.href = destination;
+  // Use configured search engine
+  const currentEngine = selectedEngineId;
+  const engines = [
+    { id: "google", url: "https://www.google.com/search?q=" },
+    { id: "bing", url: "https://cn.bing.com/search?q=" },
+    { id: "duckduckgo", url: "https://duckduckgo.com/?q=" },
+    { id: "github", url: "https://github.com/search?q=" },
+    { id: "bilibili", url: "https://search.bilibili.com/all?keyword=" }
+  ];
+  const engineObj = engines.find(e => e.id === currentEngine) || engines[0];
+  window.location.href = `${engineObj.url}${encodeURIComponent(rawValue)}`;
 }
 
 function handleSearchInput(event) {
@@ -524,50 +969,65 @@ function handleSearchKeydown(event) {
     return;
   }
 
-  if (event.key === "Enter" && state.activeSuggestionIndex >= 0) {
+  if (event.key === "Escape") {
     event.preventDefault();
-    applySuggestion(state.suggestions[state.activeSuggestionIndex]);
-    handleSearchSubmit(event);
+    hideSuggestions();
     return;
   }
 
-  if (event.key === "Escape") {
-    hideSuggestions();
+  if (event.key === "Enter" && state.activeSuggestionIndex >= 0) {
+    event.preventDefault();
+    onSuggestionClick(state.suggestions[state.activeSuggestionIndex]);
+  }
+}
+
+function syncActiveSuggestion() {
+  const items = [...elements.searchSuggestionsList.children];
+  items.forEach((item, index) => {
+    item.classList.toggle("is-active", index === state.activeSuggestionIndex);
+  });
+  syncActiveSuggestionHighlight();
+}
+
+function syncActiveSuggestionHighlight() {
+  const activeItem = elements.searchSuggestionsList.querySelector(".search-suggestions__item.is-active");
+  if (activeItem) {
+    activeItem.scrollIntoView({ block: "nearest" });
   }
 }
 
 function handleSearchFocus() {
-  if (state.suggestions.length) {
-    renderSuggestions();
+  if (state.suggestions.length && elements.searchInput.value.trim()) {
+    elements.searchSuggestions.hidden = false;
   }
 }
 
 function handleDocumentClick(event) {
-  if (
-    event.target === elements.searchInput ||
-    elements.searchSuggestions.contains(event.target)
-  ) {
-    return;
+  const isSearchClick =
+    elements.searchForm.contains(event.target) ||
+    elements.searchSuggestions.contains(event.target);
+  if (!isSearchClick) {
+    hideSuggestions();
   }
-  hideSuggestions();
 
-  if (
-    event.target === elements.manageButton ||
-    elements.manageButton.contains(event.target) ||
-    elements.topbarMenu.contains(event.target)
-  ) {
-    return;
+  // Close search engine selector details dropdown if clicked outside
+  const selector = document.getElementById("searchEngineSelector");
+  if (selector && selector.hasAttribute("open") && !selector.contains(event.target)) {
+    selector.removeAttribute("open");
   }
-  closeTopbarMenu();
 }
 
+// Dynamic language-aware hl query inside fetchSuggestions
 async function fetchSuggestions(query) {
   state.suggestionAbortController?.abort();
   const controller = new AbortController();
   state.suggestionAbortController = controller;
 
   try {
-    const response = await fetch(`${GOOGLE_SUGGEST_ENDPOINT}${encodeURIComponent(query)}`, {
+    const hl = state.language === "en" ? "en" : "zh-CN";
+    const endpoint = `https://suggestqueries.google.com/complete/search?client=firefox&hl=${hl}&q=${encodeURIComponent(query)}`;
+    
+    const response = await fetch(endpoint, {
       signal: controller.signal,
     });
     if (!response.ok) {
@@ -608,218 +1068,53 @@ function renderSuggestions() {
 
     button.type = "button";
     button.className = "search-suggestions__item";
-    button.setAttribute("role", "option");
-    button.dataset.index = String(index);
-    button.addEventListener("mousedown", (event) => event.preventDefault());
-    button.addEventListener("click", () => {
-      applySuggestion(suggestion);
-      elements.searchForm.requestSubmit();
+    button.addEventListener("click", () => onSuggestionClick(suggestion));
+    button.addEventListener("mousemove", () => {
+      state.activeSuggestionIndex = index;
+      syncActiveSuggestion();
     });
 
     icon.setAttribute("viewBox", "0 0 24 24");
     icon.setAttribute("fill", "none");
-    icon.setAttribute("class", "search-suggestions__icon");
-    path.setAttribute("d", "M10.5 4a6.5 6.5 0 1 0 4.03 11.6l4.44 4.44 1.06-1.06-4.44-4.44A6.5 6.5 0 0 0 10.5 4Zm0 1.5a5 5 0 1 1 0 10a5 5 0 0 1 0-10Z");
-    path.setAttribute("fill", "currentColor");
+    icon.setAttribute("stroke", "currentColor");
+    icon.setAttribute("stroke-width", "2");
+    icon.setAttribute("stroke-linecap", "round");
+    icon.setAttribute("stroke-linejoin", "round");
+    icon.className = "search-suggestions__icon";
+
+    path.setAttribute("d", "M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z");
     icon.append(path);
 
-    button.append(icon, document.createTextNode(suggestion));
+    const span = document.createElement("span");
+    span.textContent = suggestion;
+
+    button.append(icon, span);
     item.append(button);
     fragment.append(item);
   });
 
   elements.searchSuggestionsList.append(fragment);
-  syncActiveSuggestion();
   elements.searchSuggestions.hidden = false;
 }
 
-function syncActiveSuggestion() {
-  const nodes = elements.searchSuggestionsList.querySelectorAll(".search-suggestions__item");
-  nodes.forEach((node, index) => {
-    node.classList.toggle("is-active", index === state.activeSuggestionIndex);
-  });
-
-  if (state.activeSuggestionIndex >= 0) {
-    elements.searchInput.value = state.suggestions[state.activeSuggestionIndex];
-  }
-}
-
-function applySuggestion(value) {
-  elements.searchInput.value = value;
-  hideSuggestions();
-}
-
 function hideSuggestions() {
+  elements.searchSuggestions.hidden = true;
   state.suggestions = [];
   state.activeSuggestionIndex = -1;
-  elements.searchSuggestions.hidden = true;
-  elements.searchSuggestionsList.textContent = "";
 }
 
-function openDialog(shortcutId = null) {
-  closeTopbarMenu();
-  state.editingId = shortcutId;
-  const shortcut = state.shortcuts.find((item) => item.id === shortcutId);
-
-  updateDialogTitle();
-  elements.deleteShortcutButton.hidden = !shortcut;
-  elements.nameInput.value = shortcut?.name ?? "";
-  elements.urlInput.value = shortcut?.url ?? "";
-  elements.categoriesInput.value = shortcut?.categories.join(", ") ?? "";
-
-  renderCategorySuggestions();
-  elements.dialog.showModal();
-  queueMicrotask(() => elements.nameInput.focus());
-}
-
-function closeDialog() {
-  if (elements.dialog.open) {
-    elements.dialog.close();
-  }
-  elements.form.reset();
-  state.editingId = null;
-  updateDialogTitle();
-}
-
-function openHelpDialog() {
-  closeTopbarMenu();
-  elements.helpDialog.showModal();
-}
-
-function closeHelpDialog() {
-  if (elements.helpDialog.open) {
-    elements.helpDialog.close();
-  }
-}
-
-function openAboutDialog() {
-  closeTopbarMenu();
-  elements.aboutDialog.showModal();
-}
-
-function closeAboutDialog() {
-  if (elements.aboutDialog.open) {
-    elements.aboutDialog.close();
-  }
-}
-
-async function handleShortcutSubmit(event) {
-  event.preventDefault();
-  const formData = new FormData(elements.form);
-  const rawUrl = String(formData.get("url") ?? "").trim();
-  const existingShortcut = state.shortcuts.find((item) => item.id === state.editingId);
-  const categories = parseCategories(String(formData.get("categories") ?? ""));
-  const shortcut = {
-    id: state.editingId ?? crypto.randomUUID(),
-    name: normalizeLocalizedLabel(String(formData.get("name") ?? "").trim()),
-    url: normalizeUrl(rawUrl, true),
-    categories,
-    createdAt: existingShortcut?.createdAt ?? Date.now(),
-    clickCount: existingShortcut?.clickCount ?? 0,
-    pinned: existingShortcut?.pinned ?? false,
-  };
-
-  if (!shortcut.name || !rawUrl || !isProbablyValidUrl(shortcut.url)) {
-    elements.urlInput.setCustomValidity(t("invalidUrl"));
-    elements.urlInput.reportValidity();
-    return;
-  }
-
-  elements.urlInput.setCustomValidity("");
-
-  if (state.editingId) {
-    state.shortcuts = state.shortcuts.map((item) => (item.id === state.editingId ? shortcut : item));
-  } else {
-    state.shortcuts = [...state.shortcuts, shortcut];
-  }
-
-  mergeCategoryDefinitions(categories);
-  try {
-    await persistAll();
-    syncSelectedCategory();
-    renderCategorySuggestions();
-    renderCategories();
-    renderShortcuts();
-    closeDialog();
-  } catch (error) {
-    console.error("Failed to save shortcut", error);
-    window.alert(t("saveFailed"));
-  }
-}
-
-function handleShortcutFormKeydown(event) {
-  if (event.key !== "Enter" || event.shiftKey || event.isComposing) {
-    return;
-  }
-
-  const target = event.target;
-  if (!(target instanceof HTMLElement)) {
-    return;
-  }
-
-  if (target.tagName === "BUTTON" || target.tagName === "TEXTAREA") {
-    return;
-  }
-
-  event.preventDefault();
-  elements.form.requestSubmit();
-}
-
-async function deleteCurrentShortcut() {
-  if (!state.editingId) {
-    return;
-  }
-  state.shortcuts = state.shortcuts.filter((item) => item.id !== state.editingId);
-  await persistShortcuts();
-  syncSelectedCategory();
-  renderCategories();
-  renderShortcuts();
-  closeDialog();
-}
-
-async function createCategoriesFromPrompt() {
-  const raw = window.prompt(t("addCategoryPrompt"), "");
-  if (raw === null) {
-    return;
-  }
-  const categories = parseCategories(raw);
-  if (!categories.length) {
-    return;
-  }
-  mergeCategoryDefinitions(categories);
-  await persistCategoryDefinitions();
-  renderCategorySuggestions();
-  renderCategories();
+function onSuggestionClick(suggestion) {
+  elements.searchInput.value = suggestion;
+  hideSuggestions();
+  elements.searchForm.requestSubmit();
 }
 
 function renderShortcuts() {
   elements.shortcutGrid.textContent = "";
-  const searchQuery = state.shortcutSearchQuery;
-
-  if (!state.shortcuts.length) {
-    appendShortcutEmptyState(t("emptyShortcuts"));
-    return;
-  }
-
-  const searchMatches = searchQuery
-    ? state.shortcuts.filter((s) => {
-        const haystack = [
-          s.name,
-          displayShortcutName(s.name),
-          s.url,
-          s.categories.join(" "),
-          s.categories.map(displayCategoryName).join(" "),
-        ].join(" ").toLowerCase();
-        return haystack.includes(searchQuery);
-      })
-    : state.shortcuts;
-
-  const pinned = searchMatches.filter((s) => s.pinned);
-  const unpinned = searchMatches.filter((s) => {
-    if (s.pinned) return false;
-    if (state.selectedCategory !== "all" && !s.categories.includes(state.selectedCategory)) return false;
-    return true;
-  });
+  
+  const visible = getVisibleShortcuts();
+  const pinned = visible.filter((s) => s.pinned);
+  const unpinned = visible.filter((s) => !s.pinned);
 
   const sortedPinned = sortShortcuts(pinned);
   const sortedUnpinned = sortShortcuts(unpinned);
@@ -854,15 +1149,44 @@ function createShortcutCard(shortcut) {
 
   node.dataset.id = shortcut.id;
   node.classList.toggle("is-pinned", shortcut.pinned);
-  node.draggable = !shortcut.pinned;
+  
+  // Both pinned and unpinned links support drag sorting
+  node.draggable = true;
 
   link.href = shortcut.url;
   title.textContent = displayShortcutName(shortcut.name);
   meta.textContent = shortcut.categories.length
     ? shortcut.categories.map(displayCategoryName).join(" · ")
     : t("uncategorized");
+  
   favicon.src = getFaviconUrl(shortcut.url);
   favicon.alt = `${shortcut.name} favicon`;
+
+  // Circular initial-letters fallback badge on loading error
+  favicon.onerror = () => {
+    const parent = favicon.parentElement;
+    if (parent) {
+      parent.innerHTML = "";
+      const badge = document.createElement("div");
+      badge.className = "shortcut-card__fallback-badge";
+      const name = displayShortcutName(shortcut.name) || "?";
+      badge.textContent = name.charAt(0).toUpperCase();
+      badge.style.cssText = `
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: ${getColorForName(name)};
+        color: #fff;
+        font-weight: bold;
+        font-size: 14px;
+        border-radius: 50%;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+      `;
+      parent.appendChild(badge);
+    }
+  };
 
   link.addEventListener("click", async (event) => {
     event.preventDefault();
@@ -872,21 +1196,30 @@ function createShortcutCard(shortcut) {
 
   editButton.addEventListener("click", (event) => {
     event.preventDefault();
-    openDialog(shortcut.id);
+    event.stopPropagation();
+    showContextMenu(event, shortcut);
   });
 
-  pinButton.addEventListener("click", (event) => {
-    event.preventDefault();
-    void togglePin(shortcut.id);
-  });
-  pinButton.setAttribute("aria-label", shortcut.pinned ? t("unpinAriaLabel") : t("pinAriaLabel"));
-
-  if (!shortcut.pinned) {
-    node.addEventListener("dragstart", onDragStart);
-    node.addEventListener("dragend", onDragEnd);
-    node.addEventListener("dragover", onDragOver);
-    node.addEventListener("drop", onDrop);
+  if (pinButton) {
+    pinButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      void togglePin(shortcut.id);
+    });
+    pinButton.setAttribute("aria-label", shortcut.pinned ? t("unpinAriaLabel") : t("pinAriaLabel"));
   }
+
+  // Right-click context menu positioning
+  node.addEventListener("contextmenu", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    showContextMenu(event, shortcut);
+  });
+
+  // Drag and drop event listeners
+  node.addEventListener("dragstart", onDragStart);
+  node.addEventListener("dragend", onDragEnd);
+  node.addEventListener("dragover", onDragOver);
+  node.addEventListener("drop", onDrop);
 
   return node;
 }
@@ -950,129 +1283,75 @@ function createCategoryButton({id, label, count, active, deletable}) {
     renderShortcuts();
   });
 
-  item.addEventListener("dragover", (event) => {
-    if (!state.draggedId || id === "all") {
-      return;
-    }
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "copy";
-  });
-
-  item.addEventListener("drop", (event) => {
-    if (!state.draggedId || id === "all") {
-      return;
-    }
-    event.preventDefault();
-    void assignShortcutToCategory(state.draggedId, id);
-  });
-
   main.className = "category-item__main";
   labelNode.className = "category-item__label";
   labelNode.textContent = label;
+
   badge.className = "category-item__count";
   badge.textContent = String(count);
+
   main.append(labelNode, badge);
   selectButton.append(main);
   item.append(selectButton);
 
   if (deletable) {
-    actionWrap.className = "category-item__actions";
+    const editBtn = document.createElement("button");
+    const deleteBtn = document.createElement("button");
 
-    const renameButton = document.createElement("button");
-    renameButton.type = "button";
-    renameButton.className = "icon-button icon-button--small category-item__rename";
-    renameButton.setAttribute("aria-label", state.language === "zh" ? "重命名" : "Rename");
-    renameButton.innerHTML = `
+    editBtn.type = "button";
+    editBtn.className = "icon-button icon-button--small category-item__rename";
+    editBtn.title = state.language === "en" ? "Rename Category" : "重命名分类";
+    editBtn.innerHTML = `
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <g transform="rotate(45 12 12)">
           <path d="M10 2h4v14l-2 4-2-4V2z M10 6h4 M10 14h4"/>
         </g>
       </svg>
     `;
-    renameButton.addEventListener("click", (event) => {
-      event.stopPropagation();
-      void renameCategory(id);
+    editBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      renameCategory(id);
     });
 
-    const deleteButton = document.createElement("button");
-    deleteButton.type = "button";
-    deleteButton.className = "icon-button icon-button--small category-item__delete";
-    deleteButton.setAttribute("aria-label", t("delete"));
-    deleteButton.innerHTML = `
+    deleteBtn.type = "button";
+    deleteBtn.className = "icon-button icon-button--small category-item__delete";
+    deleteBtn.title = state.language === "en" ? "Delete Category" : "删除分类";
+    deleteBtn.innerHTML = `
       <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
         <path d="m8 8 8 8m0-8-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
       </svg>
     `;
-    deleteButton.addEventListener("click", (event) => {
-      event.stopPropagation();
-      void deleteCategory(id);
+    deleteBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      deleteCategory(id);
     });
-    actionWrap.append(renameButton, deleteButton);
+
+    actionWrap.className = "category-item__actions";
+    actionWrap.append(editBtn, deleteBtn);
     item.append(actionWrap);
   }
 
-  return item;
-}
-
-async function renameCategory(categoryName) {
-  const raw = window.prompt(t("renameCategoryPrompt"), categoryName);
-  if (raw === null) {
-    return;
-  }
-
-  const normalized = normalizeCategoryLabel(raw);
-  if (!normalized || normalized === categoryName) {
-    return;
-  }
-
-  state.categoryDefinitions = [...new Set(state.categoryDefinitions.map((item) => (
-    item === categoryName ? normalized : item
-  )))];
-
-  state.shortcuts = state.shortcuts.map((shortcut) => ({
-    ...shortcut,
-    categories: [...new Set(shortcut.categories.map((item) => (
-      item === categoryName ? normalized : item
-    )))],
-  }));
-
-  if (state.selectedCategory === categoryName) {
-    state.selectedCategory = normalized;
-  }
-
-  await persistAll();
-  renderCategorySuggestions();
-  renderCategories();
-  renderShortcuts();
-}
-
-async function deleteCategory(categoryName) {
-  if (!window.confirm(t("deleteCategoryConfirm"))) {
-    return;
-  }
-
-  state.categoryDefinitions = state.categoryDefinitions.filter((item) => item !== categoryName);
-  state.shortcuts = state.shortcuts.map((shortcut) => ({
-    ...shortcut,
-    categories: shortcut.categories.filter((item) => item !== categoryName),
-  }));
-  syncSelectedCategory();
-  await persistAll();
-  renderCategorySuggestions();
-  renderCategories();
-  renderShortcuts();
-}
-
-function renderCategorySuggestions() {
-  elements.categorySuggestions.textContent = "";
-  const fragment = document.createDocumentFragment();
-  getAllCategories().forEach((category) => {
-    const option = document.createElement("option");
-    option.value = category.name;
-    option.label = displayCategoryName(category.name);
-    fragment.append(option);
+  // Handle Drag Over elements to categorise them
+  item.addEventListener("dragover", (event) => {
+    event.preventDefault();
+    item.classList.add("dragover");
   });
-  elements.categorySuggestions.append(fragment);
+
+  item.addEventListener("dragleave", () => {
+    item.classList.remove("dragover");
+  });
+
+  item.addEventListener("drop", async (event) => {
+    event.preventDefault();
+    item.classList.remove("dragover");
+    const idValue = event.dataTransfer.getData("text/plain") || state.draggedId;
+    if (!idValue) {
+      return;
+    }
+    await assignShortcutToCategory(idValue, id);
+  });
+
+  return item;
 }
 
 function onDragStart(event) {
@@ -1081,6 +1360,11 @@ function onDragStart(event) {
   state.draggedElement = card;
   state.didCategoryDrop = false;
   card.classList.add("is-dragging", "is-drop-source");
+  
+  // Track pinned status of the dragged shortcut
+  const shortcut = state.shortcuts.find(s => s.id === state.draggedId);
+  state.draggedIsPinned = shortcut ? !!shortcut.pinned : false;
+
   event.dataTransfer.effectAllowed = canManualReorder() ? "move" : "copy";
   event.dataTransfer.setData("text/plain", state.draggedId);
 }
@@ -1093,6 +1377,7 @@ function onDragEnd(event) {
   }
   state.draggedId = null;
   state.draggedElement = null;
+  state.draggedIsPinned = false;
   state.didCategoryDrop = false;
 }
 
@@ -1105,6 +1390,14 @@ function onDragOver(event) {
   const targetCard = event.currentTarget;
   const draggedCard = state.draggedElement;
   if (!draggedCard || draggedCard === targetCard) {
+    return;
+  }
+
+  // Boundary check: pinned items drag-sorting only within their zone
+  const targetShortcut = state.shortcuts.find(s => s.id === targetCard.dataset.id);
+  const targetIsPinned = targetShortcut ? !!targetShortcut.pinned : false;
+  
+  if (state.draggedIsPinned !== targetIsPinned) {
     return;
   }
 
@@ -1170,13 +1463,14 @@ async function assignShortcutToCategory(shortcutId, categoryName) {
 async function recordShortcutClick(shortcutId) {
   state.shortcuts = state.shortcuts.map((shortcut) =>
     shortcut.id === shortcutId
-      ? {...shortcut, clickCount: shortcut.clickCount + 1}
+      ? {...shortcut, clickCount: (shortcut.clickCount || 0) + 1}
       : shortcut,
   );
   await persistShortcuts();
   if (state.sortMode === "click-desc") {
     renderShortcuts();
   }
+  updateStatisticsPanel();
 }
 
 async function togglePin(shortcutId) {
@@ -1189,100 +1483,75 @@ async function togglePin(shortcutId) {
   renderShortcuts();
 }
 
-async function loadShortcuts() {
-  try {
-    const savedValue = await readStorage(STORAGE_KEY);
-    if (!savedValue) {
-      return defaultShortcuts;
-    }
-
-    const parsed = typeof savedValue === "string" ? JSON.parse(savedValue) : savedValue;
-    if (!Array.isArray(parsed)) {
-      return defaultShortcuts;
-    }
-
-    const normalized = parsed
-      .map((item) => ({
-        id: String(item.id ?? crypto.randomUUID()),
-        name: normalizeLocalizedLabel(String(item.name ?? "").trim()),
-        url: String(item.url ?? "").trim(),
-        categories: normalizeCategories(item.categories),
-        createdAt: normalizeCreatedAt(item.createdAt),
-        clickCount: normalizeClickCount(item.clickCount),
-        pinned: Boolean(item.pinned),
-      }))
-      .filter(isValidShortcut);
-
-    return normalized.length ? normalized : defaultShortcuts;
-  } catch {
-    return defaultShortcuts;
-  }
-}
-
-async function loadCategoryDefinitions() {
-  const savedValue = await readStorage(CATEGORY_STORAGE_KEY);
-  if (!savedValue) {
-    return defaultCategoryDefinitions;
-  }
-  const parsed = typeof savedValue === "string" ? JSON.parse(savedValue) : savedValue;
-  return normalizeCategoryDefinitions(parsed);
-}
-
-async function persistAll() {
-  await Promise.all([persistShortcuts(), persistCategoryDefinitions()]);
-}
-
-async function persistShortcuts() {
-  await writeStorage(STORAGE_KEY, state.shortcuts);
-}
-
-async function persistCategoryDefinitions() {
-  await writeStorage(CATEGORY_STORAGE_KEY, state.categoryDefinitions);
-}
-
-function toggleTopbarMenu() {
-  const isHidden = elements.topbarMenu.hidden;
-  elements.topbarMenu.hidden = !isHidden;
-  elements.manageButton.setAttribute("aria-expanded", String(isHidden));
-}
-
 function closeTopbarMenu() {
-  elements.topbarMenu.hidden = true;
-  elements.manageButton.setAttribute("aria-expanded", "false");
+  // Obsolete: topbar menu is replaced by Sonoma settings panel
 }
 
 function exportConfig() {
-  closeTopbarMenu();
   const payload = {
-    version: 3,
-    exportedAt: new Date().toISOString(),
-    sortMode: state.sortMode,
-    language: state.language,
-    categories: state.categoryDefinitions,
+    version: "1.2.0",
     shortcuts: state.shortcuts,
+    categories: state.categoryDefinitions,
   };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], {type: "application/json"});
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {
+    type: "application/json",
+  });
   const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  const date = new Date().toISOString().slice(0, 10);
-  link.href = url;
-  link.download = `noon-new-tab-shortcuts-${date}.json`;
-  document.body.append(link);
-  link.click();
-  link.remove();
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `noon-new-tab-shortcuts-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  anchor.click();
   URL.revokeObjectURL(url);
 }
 
 function triggerImportConfig() {
-  closeTopbarMenu();
   elements.importConfigInput.value = "";
   elements.importConfigInput.click();
 }
 
-function triggerWallpaperUpload() {
-  closeTopbarMenu();
-  elements.wallpaperUploadInput.value = "";
-  elements.wallpaperUploadInput.click();
+async function handleImportConfig(event) {
+  const [file] = event.target.files ?? [];
+  if (!file) {
+    return;
+  }
+
+  try {
+    const text = await file.text();
+    const payload = JSON.parse(text);
+    const shortcutsSource = Array.isArray(payload) ? payload : payload?.shortcuts;
+    if (!Array.isArray(shortcutsSource)) {
+      throw new Error("Invalid config shape");
+    }
+
+    const importedShortcuts = shortcutsSource.map((item) => ({
+      id: String(item.id ?? crypto.randomUUID()),
+      name: normalizeLocalizedLabel(String(item.name ?? "").trim()),
+      url: normalizeUrl(String(item.url ?? "").trim(), true),
+      categories: Array.isArray(item.categories) ? item.categories.map(String) : [],
+      pinned: Boolean(item.pinned),
+      createdAt: Number(item.createdAt) || Date.now(),
+      clickCount: Number(item.clickCount) || 0,
+    }));
+
+    const categoriesSource = payload?.categories;
+    const importedCategories = Array.isArray(categoriesSource)
+      ? normalizeCategoryDefinitions(categoriesSource)
+      : [];
+
+    state.shortcuts = importedShortcuts;
+    state.categoryDefinitions = mergeCategoryDefinitionLists(
+      state.categoryDefinitions,
+      [...importedCategories, ...collectCategoryDefinitions(importedShortcuts)],
+    );
+
+    syncSelectedCategory();
+    await persistAll();
+    renderCategorySuggestions();
+    renderCategories();
+    renderShortcuts();
+  } catch {
+    window.alert(t("importFailed"));
+  }
 }
 
 async function handleWallpaperUpload(event) {
@@ -1292,6 +1561,13 @@ async function handleWallpaperUpload(event) {
   try {
     const dataUrl = await readFileAsDataUrl(file);
     state.wallpaper = dataUrl;
+    
+    // De-activate daily wallpaper option
+    localStorage.setItem("noon-new-tab-daily-wallpaper-type-v1", "none");
+    if (document.getElementById("settingsDailyWallpaperSelect")) {
+      document.getElementById("settingsDailyWallpaperSelect").value = "none";
+    }
+
     applyWallpaper();
     await writeLocalOnlyStorage(WALLPAPER_STORAGE_KEY, dataUrl);
   } catch {
@@ -1300,33 +1576,56 @@ async function handleWallpaperUpload(event) {
 }
 
 async function clearWallpaper() {
-  closeTopbarMenu();
   state.wallpaper = null;
+  localStorage.setItem("noon-new-tab-daily-wallpaper-type-v1", "none");
+  if (document.getElementById("settingsDailyWallpaperSelect")) {
+    document.getElementById("settingsDailyWallpaperSelect").value = "none";
+  }
   applyWallpaper();
   await removeLocalOnlyStorage(WALLPAPER_STORAGE_KEY);
 }
 
 function applyWallpaper() {
-  const hasWallpaper = !!state.wallpaper;
-  document.body.classList.toggle("has-wallpaper", hasWallpaper);
-  if (hasWallpaper) {
-    elements.wallpaperOverlay.style.backgroundImage = `url(${state.wallpaper})`;
-    elements.wallpaperOverlay.hidden = false;
+  const dailyType = localStorage.getItem("noon-new-tab-daily-wallpaper-type-v1") || "none";
+  
+  if (dailyType !== "none") {
+    const cachedDate = localStorage.getItem("noon-new-tab-daily-wallpaper-cached-date-v1");
+    const cachedData = localStorage.getItem("noon-new-tab-daily-wallpaper-cached-v1");
+    const cachedType = localStorage.getItem("noon-new-tab-daily-wallpaper-cached-type-v1");
+    const todayStr = new Date().toISOString().slice(0, 10);
+    
+    if (cachedDate === todayStr && cachedData && cachedType === dailyType) {
+      document.body.classList.add("has-wallpaper");
+      elements.wallpaperOverlay.style.backgroundImage = `url(${cachedData})`;
+      elements.wallpaperOverlay.hidden = false;
+      return;
+    }
+    
+    let fallbackUrl = "";
+    if (dailyType === "bing") {
+      fallbackUrl = `https://api.dujin.org/bing/1920.php?d=${todayStr}`;
+    } else if (dailyType === "picsum") {
+      fallbackUrl = `https://picsum.photos/1920/1080?sig=${todayStr}`;
+    }
+    
+    if (fallbackUrl) {
+      document.body.classList.add("has-wallpaper");
+      elements.wallpaperOverlay.style.backgroundImage = `url(${fallbackUrl})`;
+      elements.wallpaperOverlay.hidden = false;
+    }
+    
+    void fetchAndCacheDailyWallpaper();
   } else {
-    elements.wallpaperOverlay.style.backgroundImage = "";
-    elements.wallpaperOverlay.hidden = true;
+    const hasWallpaper = !!state.wallpaper;
+    document.body.classList.toggle("has-wallpaper", hasWallpaper);
+    if (hasWallpaper) {
+      elements.wallpaperOverlay.style.backgroundImage = `url(${state.wallpaper})`;
+      elements.wallpaperOverlay.hidden = false;
+    } else {
+      elements.wallpaperOverlay.style.backgroundImage = "";
+      elements.wallpaperOverlay.hidden = true;
+    }
   }
-}
-
-async function loadWallpaper() {
-  const savedWallpaper = await readLocalOnlyStorage(WALLPAPER_STORAGE_KEY);
-  return typeof savedWallpaper === "string" && savedWallpaper.length > 0 ? savedWallpaper : null;
-}
-
-function triggerLogoUpload() {
-  closeTopbarMenu();
-  elements.logoUploadInput.value = "";
-  elements.logoUploadInput.click();
 }
 
 async function handleLogoUpload(event) {
@@ -1346,232 +1645,244 @@ async function handleLogoUpload(event) {
 }
 
 async function clearCustomLogo() {
-  closeTopbarMenu();
   state.customLogo = null;
   applyTheme(state.themePreference);
   await removeLocalOnlyStorage(CUSTOM_LOGO_STORAGE_KEY);
 }
 
-async function handleImportConfig(event) {
-  const [file] = event.target.files ?? [];
-  if (!file) {
+function openDialog(id) {
+  state.editingId = id ?? null;
+  const shortcut = state.shortcuts.find((item) => item.id === id);
+
+  if (shortcut) {
+    elements.nameInput.value = shortcut.name;
+    elements.urlInput.value = shortcut.url;
+    elements.categoriesInput.value = shortcut.categories.join(", ");
+    elements.deleteShortcutButton.style.display = "inline-block";
+  } else {
+    elements.nameInput.value = "";
+    elements.urlInput.value = "";
+    elements.categoriesInput.value = "";
+    elements.deleteShortcutButton.style.display = "none";
+  }
+
+  updateDialogTitle();
+  renderCategorySuggestions();
+  elements.dialog.showModal();
+  queueMicrotask(() => elements.nameInput.focus());
+}
+
+function closeDialog() {
+  if (elements.dialog.open) {
+    elements.dialog.close();
+  }
+  elements.form.reset();
+  state.editingId = null;
+  updateDialogTitle();
+}
+
+function openHelpDialog() {
+  const tabHelp = document.getElementById("tabHelp");
+  const toggle = document.getElementById("settingsToggle");
+  if (tabHelp) tabHelp.checked = true;
+  if (toggle) toggle.checked = true;
+}
+
+function closeHelpDialog() {
+  const toggle = document.getElementById("settingsToggle");
+  if (toggle) toggle.checked = false;
+}
+
+function openAboutDialog() {
+  const tabAbout = document.getElementById("tabAbout");
+  const toggle = document.getElementById("settingsToggle");
+  if (tabAbout) tabAbout.checked = true;
+  if (toggle) toggle.checked = true;
+}
+
+function closeAboutDialog() {
+  const toggle = document.getElementById("settingsToggle");
+  if (toggle) toggle.checked = false;
+}
+
+async function handleShortcutSubmit(event) {
+  event.preventDefault();
+  const formData = new FormData(elements.form);
+  const rawUrl = String(formData.get("url") ?? "").trim();
+  const existingShortcut = state.shortcuts.find((item) => item.id === state.editingId);
+  const categories = parseCategories(String(formData.get("categories") ?? ""));
+  const shortcut = {
+    id: state.editingId ?? crypto.randomUUID(),
+    name: normalizeLocalizedLabel(String(formData.get("name") ?? "").trim()),
+    url: normalizeUrl(rawUrl, true),
+    categories,
+    createdAt: existingShortcut?.createdAt ?? Date.now(),
+    clickCount: existingShortcut?.clickCount ?? 0,
+    pinned: existingShortcut?.pinned ?? false,
+  };
+
+  if (!isProbablyValidUrl(shortcut.url)) {
+    window.alert(t("invalidUrl"));
+    elements.urlInput.focus();
     return;
   }
 
-  try {
-    const text = await file.text();
-    const payload = JSON.parse(text);
-    const shortcutsSource = Array.isArray(payload) ? payload : payload?.shortcuts;
-    if (!Array.isArray(shortcutsSource)) {
-      throw new Error("Invalid config shape");
-    }
-
-    const importedShortcuts = shortcutsSource
-      .map((item) => ({
-        id: String(item.id ?? crypto.randomUUID()),
-        name: normalizeLocalizedLabel(String(item.name ?? "").trim()),
-        url: normalizeUrl(String(item.url ?? "").trim(), true),
-        categories: normalizeCategories(item.categories),
-        createdAt: normalizeCreatedAt(item.createdAt),
-        clickCount: normalizeClickCount(item.clickCount),
-        pinned: Boolean(item.pinned),
-      }))
-      .filter(isValidShortcut)
-      .filter((item) => isProbablyValidUrl(item.url));
-
-    if (!importedShortcuts.length) {
-      throw new Error("No valid shortcuts");
-    }
-
-    state.shortcuts = importedShortcuts;
-    state.categoryDefinitions = mergeCategoryDefinitionLists(
-      normalizeCategoryDefinitions(payload?.categories),
-      collectCategoryDefinitions(importedShortcuts),
+  const previousShortcuts = [...state.shortcuts];
+  if (state.editingId) {
+    state.shortcuts = state.shortcuts.map((item) =>
+      item.id === state.editingId ? shortcut : item,
     );
-    state.sortMode = normalizeSortMode(payload?.sortMode);
-    state.language = normalizeLanguage(payload?.language) || state.language;
-    elements.sortSelect.value = state.sortMode;
+  } else {
+    state.shortcuts = [...state.shortcuts, shortcut];
+  }
+
+  mergeCategoryDefinitions(categories);
+  closeDialog();
+
+  try {
     await persistAll();
-    await saveSortMode(state.sortMode);
-    await saveLanguage(state.language);
-    syncSelectedCategory();
-    applyLanguage();
     renderCategorySuggestions();
     renderCategories();
     renderShortcuts();
   } catch {
-    window.alert(t("importFailed"));
+    state.shortcuts = previousShortcuts;
+    window.alert(t("saveFailed"));
   }
 }
 
-async function loadThemePreference() {
-  const savedTheme = sessionStorage.getItem("noon-new-tab-session-theme");
-  
-  // Clean up any old persistent storage theme keys if they exist
-  try {
-    localStorage.removeItem(THEME_STORAGE_KEY);
-    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.sync) {
-      chrome.storage.sync.remove([THEME_STORAGE_KEY]);
+async function deleteCurrentShortcut() {
+  if (!state.editingId) {
+    return;
+  }
+
+  const shortcut = state.shortcuts.find((item) => item.id === state.editingId);
+  if (!shortcut) {
+    return;
+  }
+
+  closeDialog();
+  await deleteShortcutWithUndo(shortcut);
+}
+
+function handleShortcutFormKeydown(event) {
+  if (event.key === "Enter" && !event.shiftKey) {
+    const isButton =
+      event.target.tagName === "BUTTON" ||
+      (event.target.getAttribute("role") === "button");
+    if (!isButton) {
+      event.preventDefault();
+      elements.form.requestSubmit();
     }
-  } catch (e) {
-    // Ignore context errors
-  }
-
-  if (savedTheme === "light" || savedTheme === "dark") {
-    return {
-      mode: "manual",
-      theme: savedTheme,
-    };
-  }
-  return "system";
-}
-
-async function saveThemePreference(theme) {
-  if (theme === "system") {
-    sessionStorage.removeItem("noon-new-tab-session-theme");
-  } else {
-    sessionStorage.setItem("noon-new-tab-session-theme", theme);
   }
 }
 
-async function loadCustomLogo() {
-  const savedLogo = await readLocalOnlyStorage(CUSTOM_LOGO_STORAGE_KEY);
-  return typeof savedLogo === "string" && savedLogo.length > 0 ? savedLogo : null;
-}
-
-async function loadSortMode() {
-  return normalizeSortMode(await readStorage(SORT_STORAGE_KEY));
-}
-
-async function saveSortMode(value) {
-  await writeStorage(SORT_STORAGE_KEY, normalizeSortMode(value));
-}
-
-async function loadLanguage() {
-  return normalizeLanguage(await readStorage(LANGUAGE_STORAGE_KEY)) || "zh";
-}
-
-async function saveLanguage(value) {
-  await writeStorage(LANGUAGE_STORAGE_KEY, normalizeLanguage(value) || "zh");
-}
-
-function isValidShortcut(item) {
-  return (
-    item &&
-    typeof item.id === "string" &&
-    typeof item.name === "string" &&
-    typeof item.url === "string" &&
-    Array.isArray(item.categories) &&
-    typeof item.createdAt === "number" &&
-    typeof item.clickCount === "number" &&
-    item.name.length > 0 &&
-    item.url.length > 0
-  );
-}
-
-function normalizeCategories(value) {
-  if (!Array.isArray(value)) {
-    return [];
+function createCategoriesFromPrompt() {
+  const isEn = state.language === "en";
+  const rawValue = window.prompt(t("addCategoryPrompt"));
+  if (rawValue === null) {
+    return;
   }
-  return [...new Set(
-    value
-      .map(normalizeCategoryLabel)
-      .filter(Boolean),
-  )];
-}
 
-function normalizeCategoryDefinitions(value) {
-  if (!Array.isArray(value)) {
-    return [];
+  const categories = parseCategories(rawValue);
+  if (!categories.length) {
+    return;
   }
-  return [...new Set(value.map(normalizeCategoryLabel).filter(Boolean))];
+
+  const previousCategories = [...state.categoryDefinitions];
+  mergeCategoryDefinitions(categories);
+
+  persistCategoryDefinitions().catch(() => {
+    state.categoryDefinitions = previousCategories;
+    window.alert(isEn ? "Failed to save category. Please try again." : "保存分类失败，请重试。");
+  });
+
+  renderCategorySuggestions();
+  renderCategories();
 }
 
-function mergeCategoryDefinitionLists(left, right) {
-  return [...new Set([...left, ...right])];
-}
-
-function collectCategoryDefinitions(shortcuts) {
-  return [...new Set(shortcuts.flatMap((shortcut) => normalizeCategories(shortcut.categories)))];
-}
-
-function ensureCategoryDefinitionsFromShortcuts() {
-  state.categoryDefinitions = mergeCategoryDefinitionLists(
-    state.categoryDefinitions,
-    collectCategoryDefinitions(state.shortcuts),
-  );
-}
-
-function mergeCategoryDefinitions(categories) {
-  state.categoryDefinitions = mergeCategoryDefinitionLists(
-    state.categoryDefinitions,
-    normalizeCategories(categories),
-  );
-}
-
-function normalizeCategoryLabel(value) {
-  return normalizeLocalizedLabel(value);
-}
-
-function normalizeLocalizedLabel(value) {
-  return String(value ?? "")
-    .replaceAll("｜", "|")
-    .split("|")
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .join("|");
-}
-
-function normalizeCreatedAt(value) {
-  const timestamp = Number(value);
-  return Number.isFinite(timestamp) && timestamp > 0 ? timestamp : Date.now();
-}
-
-function normalizeClickCount(value) {
-  const count = Number(value);
-  return Number.isFinite(count) && count >= 0 ? count : 0;
-}
-
-function normalizeSortMode(value) {
-  return ["click-desc", "manual", "name-asc", "name-desc", "newest", "oldest"].includes(value)
-    ? value
-    : "click-desc";
-}
-
-function normalizeLanguage(value) {
-  return value === "en" || value === "zh" ? value : null;
-}
-
-function parseCategories(value) {
-  return [...new Set(
-    value
-      .split(/[，,]/)
-      .map(normalizeCategoryLabel)
-      .filter(Boolean),
-  )];
-}
-
-function displayCategoryName(value) {
-  const [zh, en] = normalizeLocalizedLabel(value).split("|");
-  if (state.language === "en") {
-    return en || zh || "";
+async function renameCategory(id) {
+  const isEn = state.language === "en";
+  const rawValue = window.prompt(t("renameCategoryPrompt"), id);
+  if (rawValue === null) {
+    return;
   }
-  return zh || en || "";
+
+  const [newName] = parseCategories(rawValue);
+  if (!newName || newName === id) {
+    return;
+  }
+
+  const previousShortcuts = [...state.shortcuts];
+  const previousCategories = [...state.categoryDefinitions];
+
+  state.categoryDefinitions = state.categoryDefinitions.map((cat) => (cat === id ? newName : cat));
+  state.shortcuts = state.shortcuts.map((shortcut) => ({
+    ...shortcut,
+    categories: shortcut.categories.map((cat) => (cat === id ? newName : cat)),
+  }));
+
+  if (state.selectedCategory === id) {
+    state.selectedCategory = newName;
+  }
+
+  try {
+    await persistAll();
+    renderCategorySuggestions();
+    renderCategories();
+    renderShortcuts();
+  } catch {
+    state.shortcuts = previousShortcuts;
+    state.categoryDefinitions = previousCategories;
+    if (state.selectedCategory === newName) {
+      state.selectedCategory = id;
+    }
+    window.alert(isEn ? "Failed to rename category. Please try again." : "重命名分类失败，请重试。");
+  }
 }
 
-function displayShortcutName(value) {
-  const [zh, en] = normalizeLocalizedLabel(value).split("|");
-  if (state.language === "en") {
-    return en || zh || "";
+async function deleteCategory(id) {
+  if (!window.confirm(t("deleteCategoryConfirm"))) {
+    return;
   }
-  return zh || en || "";
+
+  const previousShortcuts = [...state.shortcuts];
+  const previousCategories = [...state.categoryDefinitions];
+
+  state.categoryDefinitions = state.categoryDefinitions.filter((cat) => cat !== id);
+  state.shortcuts = state.shortcuts.map((shortcut) => ({
+    ...shortcut,
+    categories: shortcut.categories.filter((cat) => cat !== id),
+  }));
+
+  if (state.selectedCategory === id) {
+    state.selectedCategory = "all";
+  }
+
+  try {
+    await persistAll();
+    renderCategorySuggestions();
+    renderCategories();
+    renderShortcuts();
+  } catch {
+    state.shortcuts = previousShortcuts;
+    state.categoryDefinitions = previousCategories;
+    if (state.selectedCategory === "all") {
+      state.selectedCategory = id;
+    }
+    window.alert(state.language === "en" ? "Failed to delete category. Please try again." : "删除分类失败，请重试。");
+  }
 }
 
-function matchesCategorySearch(rawName, query) {
-  if (!query) {
-    return true;
-  }
-  return `${rawName} ${displayCategoryName(rawName)}`.toLowerCase().includes(query);
+function renderCategorySuggestions() {
+  elements.categorySuggestions.textContent = "";
+  const fragment = document.createDocumentFragment();
+  getAllCategories().forEach((category) => {
+    const option = document.createElement("option");
+    option.value = category.name;
+    option.label = displayCategoryName(category.name);
+    fragment.append(option);
+  });
+  elements.categorySuggestions.append(fragment);
 }
 
 function getAllCategories() {
@@ -1597,18 +1908,6 @@ function getVisibleShortcuts() {
   const selectedCategory = state.selectedCategory;
 
   return sortShortcuts(state.shortcuts.filter((shortcut) => {
-    if (shortcut.pinned) {
-      if (!searchQuery) return true;
-      const haystack = [
-        shortcut.name,
-        displayShortcutName(shortcut.name),
-        shortcut.url,
-        shortcut.categories.join(" "),
-        shortcut.categories.map(displayCategoryName).join(" "),
-      ].join(" ").toLowerCase();
-      return haystack.includes(searchQuery);
-    }
-
     if (selectedCategory !== "all" && !shortcut.categories.includes(selectedCategory)) {
       return false;
     }
@@ -1663,202 +1962,28 @@ function syncSelectedCategory() {
   }
 }
 
-function looksLikeUrl(value) {
-  return /^(https?:\/\/|[\w-]+\.[\w.-]+)/i.test(value);
-}
-
-function normalizeUrl(value, enforceProtocol) {
-  const candidate = enforceProtocol && !/^https?:\/\//i.test(value) ? `https://${value}` : value;
-  try {
-    return new URL(candidate).toString();
-  } catch {
-    return candidate;
+function normalizeCategoryDefinitions(value) {
+  if (!Array.isArray(value)) {
+    return [];
   }
+  const normCatLabel = (val) => String(val ?? "").replaceAll("｜", "|").split("|").map(p => p.trim()).filter(Boolean).join("|");
+  return [...new Set(value.map(normCatLabel).filter(Boolean))];
 }
 
-function isProbablyValidUrl(value) {
-  try {
-    const parsed = new URL(value);
-    return Boolean(parsed.hostname && parsed.hostname.includes("."));
-  } catch {
-    return false;
-  }
+function mergeCategoryDefinitionLists(left, right) {
+  return [...new Set([...left, ...right])];
 }
 
-function getFaviconUrl(value) {
-  try {
-    const url = new URL(value);
-    return `https://www.google.com/s2/favicons?sz=64&domain_url=${encodeURIComponent(url.origin)}`;
-  } catch {
-    return "";
-  }
-}
-
-async function readStorage(key) {
-  if (hasChromeSyncStorage()) {
-    try {
-      const manifestKey = getChunkManifestKey(key);
-      const result = await chrome.storage.sync.get([key, manifestKey]);
-      const manifest = result[manifestKey];
-
-      if (manifest?.chunked && Number.isInteger(manifest.count)) {
-        const chunkKeys = Array.from({length: manifest.count}, (_, index) => getChunkKey(key, index));
-        const chunks = await chrome.storage.sync.get(chunkKeys);
-        const encoded = chunkKeys.map((chunkKey) => String(chunks[chunkKey] ?? "")).join("");
-        if (encoded) {
-          return JSON.parse(decodeBase64Utf8(encoded));
-        }
-      }
-
-      if (result[key] !== undefined) {
-        return result[key];
-      }
-    } catch {
-      // Fall through to local fallback.
-    }
-  }
-
-  const rawValue = localStorage.getItem(getLocalFallbackKey(key));
-  if (!rawValue) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(rawValue);
-  } catch {
-    return rawValue;
-  }
-}
-
-async function writeStorage(key, value) {
-  if (hasChromeSyncStorage()) {
-    try {
-      await writeSyncStorageChunked(key, value);
-      localStorage.removeItem(getLocalFallbackKey(key));
-      return;
-    } catch {
-      // Fall through to local fallback.
-    }
-  }
-
-  localStorage.setItem(getLocalFallbackKey(key), JSON.stringify(value));
-}
-
-function hasChromeSyncStorage() {
-  return typeof chrome !== "undefined" && Boolean(chrome.storage?.sync);
-}
-
-function getLocalFallbackKey(key) {
-  return `fallback:${key}`;
-}
-
-function getChunkManifestKey(key) {
-  return `${key}__manifest`;
-}
-
-function getChunkKey(key, index) {
-  return `${key}__chunk_${index}`;
-}
-
-async function writeSyncStorageChunked(key, value) {
-  const encoded = encodeBase64Utf8(JSON.stringify(value));
-  const manifestKey = getChunkManifestKey(key);
-  const current = await chrome.storage.sync.get([manifestKey]);
-  const previousCount = current[manifestKey]?.count ?? 0;
-
-  if (encoded.length <= SYNC_CHUNK_SIZE) {
-    await chrome.storage.sync.set({[key]: value});
-    const removeKeys = [manifestKey, ...Array.from({length: previousCount}, (_, index) => getChunkKey(key, index))];
-    if (removeKeys.length) {
-      await chrome.storage.sync.remove(removeKeys);
-    }
-    return;
-  }
-
-  const chunks = [];
-  for (let index = 0; index < encoded.length; index += SYNC_CHUNK_SIZE) {
-    chunks.push(encoded.slice(index, index + SYNC_CHUNK_SIZE));
-  }
-
-  const payload = {
-    [manifestKey]: {
-      chunked: true,
-      count: chunks.length,
-    },
+function collectCategoryDefinitions(shortcuts) {
+  const normCatLabel = (val) => String(val ?? "").replaceAll("｜", "|").split("|").map(p => p.trim()).filter(Boolean).join("|");
+  const normCategories = (val) => {
+    if (!Array.isArray(val)) return [];
+    return [...new Set(val.map(normCatLabel).filter(Boolean))];
   };
-
-  chunks.forEach((chunk, index) => {
-    payload[getChunkKey(key, index)] = chunk;
-  });
-
-  await chrome.storage.sync.remove([key]);
-  await chrome.storage.sync.set(payload);
-
-  const removeKeys = Array.from(
-    {length: Math.max(0, previousCount - chunks.length)},
-    (_, index) => getChunkKey(key, chunks.length + index),
-  );
-  if (removeKeys.length) {
-    await chrome.storage.sync.remove(removeKeys);
-  }
+  return [...new Set(shortcuts.flatMap((shortcut) => normCategories(shortcut.categories)))];
 }
 
-function encodeBase64Utf8(value) {
-  const bytes = new TextEncoder().encode(value);
-  let binary = "";
-  bytes.forEach((byte) => {
-    binary += String.fromCharCode(byte);
-  });
-  return btoa(binary);
-}
-
-function decodeBase64Utf8(value) {
-  const binary = atob(value);
-  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
-  return new TextDecoder().decode(bytes);
-}
-
-async function readLocalOnlyStorage(key) {
-  if (typeof chrome !== "undefined" && chrome.storage?.local) {
-    const result = await chrome.storage.local.get([key]);
-    return result[key];
-  }
-
-  const rawValue = localStorage.getItem(key);
-  if (!rawValue) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(rawValue);
-  } catch {
-    return rawValue;
-  }
-}
-
-async function writeLocalOnlyStorage(key, value) {
-  if (typeof chrome !== "undefined" && chrome.storage?.local) {
-    await chrome.storage.local.set({[key]: value});
-    return;
-  }
-
-  localStorage.setItem(key, JSON.stringify(value));
-}
-
-async function removeLocalOnlyStorage(key) {
-  if (typeof chrome !== "undefined" && chrome.storage?.local) {
-    await chrome.storage.local.remove(key);
-    return;
-  }
-
-  localStorage.removeItem(key);
-}
-
-function readFileAsDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ""));
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
-}
+window.openHelpDialog = openHelpDialog;
+window.openAboutDialog = openAboutDialog;
+window.closeHelpDialog = closeHelpDialog;
+window.closeAboutDialog = closeAboutDialog;

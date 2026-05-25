@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 272 92">
+  <g transform="translate(30, 16) scale(2.2)">
+    <rect x="2" y="6" width="20" height="13" rx="3" fill="#00a1d6" />
+    <path d="M8 6L5 2m8 4l3-4" stroke="#00a1d6" stroke-width="1.8" stroke-linecap="round" />
+    <rect x="5" y="9" width="2.5" height="3.5" rx="1" fill="#FFF" />
+    <rect x="16.5" y="9" width="2.5" height="3.5" rx="1" fill="#FFF" />
+    <path d="M9 15c1.2 1.2 3.8 1.2 5 0" stroke="#FFF" stroke-width="1.5" stroke-linecap="round" />
+  </g>
+  <text x="95" y="58" font-family="system-ui, -apple-system, sans-serif" font-size="34" font-weight="700" fill="#00a1d6">bilibili</text>
+</svg>

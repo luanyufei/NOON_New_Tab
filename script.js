@@ -11,7 +11,8 @@ import {
   readFileAsDataUrl,
   ensureCategoryDefinitionsFromShortcuts,
   mergeCategoryDefinitions,
-  matchesCategorySearch
+  matchesCategorySearch,
+  parseCategories
 } from "./utils.js";
 import {
   STORAGE_KEY,

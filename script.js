@@ -48,6 +48,7 @@ import { translations, t } from "./i18n.js";
 
 const GOOGLE_LOGO_LIGHT = "https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png";
 const GOOGLE_LOGO_DARK = "https://www.google.com/images/branding/googlelogo/2x/googlelogo_light_color_272x92dp.png";
+const SHORTCUT_BATCH_SIZE = 120;
 
 const elements = {
   searchForm: document.querySelector("#searchForm"),
@@ -123,6 +124,12 @@ let selectedEngineId = "google";
 let contextMenu = null;
 let trashZone = null;
 let toastTimeout = null;
+let shortcutSearchTimer = null;
+let shortcutLookup = new Map();
+let visibleShortcutCache = [];
+let renderedShortcutCount = 0;
+let shortcutRenderObserver = null;
+let shortcutRenderGeneration = 0;
 
 function initializeEnhancements() {
   // Bind search engine selector options in the search box
@@ -268,10 +275,11 @@ function initializeEnhancements() {
   // Settings dialog backdrops and close
   const settingsBackdrop = document.querySelector(".settings-backdrop-overlay");
   if (settingsBackdrop) {
-    settingsBackdrop.addEventListener("click", () => {
-      if (elements.settingsToggle) {
-        elements.settingsToggle.checked = false;
-      }
+    settingsBackdrop.addEventListener("click", (event) => {
+      // This element is a <label>. Prevent its default checkbox toggle,
+      // otherwise setting checked=false here would immediately toggle it on again.
+      event.preventDefault();
+      closeSettings();
     });
   }
 
@@ -689,9 +697,6 @@ hydrate().then(() => {
   applyTheme(state.themePreference);
   applyWallpaper();
   applyLanguage();
-  renderCategorySuggestions();
-  renderCategories();
-  renderShortcuts();
   bindEvents();
   
   // Fade out dynamic loader spinner
@@ -728,6 +733,14 @@ function bindEvents() {
   document.addEventListener("click", handleDocumentClick);
   elements.addShortcutButton.addEventListener("click", () => openDialog());
   elements.addCategoryButton.addEventListener("click", createCategoriesFromPrompt);
+  elements.shortcutGrid.addEventListener("click", handleShortcutGridClick);
+  elements.shortcutGrid.addEventListener("contextmenu", handleShortcutGridContextMenu);
+  elements.shortcutGrid.addEventListener("error", handleShortcutFaviconError, true);
+  elements.shortcutGrid.addEventListener("dragstart", onDragStart);
+  elements.shortcutGrid.addEventListener("dragend", onDragEnd);
+  elements.shortcutGrid.addEventListener("dragover", onDragOver);
+  elements.shortcutGrid.addEventListener("drop", onDrop);
+  document.addEventListener("keydown", handleGlobalKeydown);
   
   // File upload inputs
   elements.logoUploadInput.addEventListener("change", handleLogoUpload);
@@ -755,6 +768,23 @@ function handleDialogBackdropClick(event) {
   if (isBackdropClick) {
     closeDialog();
   }
+}
+
+function closeSettings() {
+  if (!elements.settingsToggle?.checked) {
+    return;
+  }
+  elements.settingsToggle.checked = false;
+  elements.settingsButton?.focus();
+}
+
+function handleGlobalKeydown(event) {
+  if (event.key !== "Escape" || !elements.settingsToggle?.checked) {
+    return;
+  }
+  event.preventDefault();
+  event.stopPropagation();
+  closeSettings();
 }
 
 function applyLanguage() {
@@ -841,8 +871,11 @@ function handleCategorySearchInput(event) {
 
 function handleShortcutSearchInput(event) {
   state.shortcutSearchQuery = event.target.value.trim().toLowerCase();
-  renderCategories();
-  renderShortcuts();
+  window.clearTimeout(shortcutSearchTimer);
+  shortcutSearchTimer = window.setTimeout(() => {
+    renderCategories();
+    renderShortcuts();
+  }, 80);
 }
 
 function handleSortChange(event) {
@@ -1111,7 +1144,10 @@ function onSuggestionClick(suggestion) {
 }
 
 function renderShortcuts() {
+  const generation = ++shortcutRenderGeneration;
+  shortcutRenderObserver?.disconnect();
   elements.shortcutGrid.textContent = "";
+  shortcutLookup = new Map(state.shortcuts.map((shortcut) => [shortcut.id, shortcut]));
   
   const visible = getVisibleShortcuts();
   const pinned = visible.filter((s) => s.pinned);
@@ -1119,24 +1155,54 @@ function renderShortcuts() {
 
   const sortedPinned = sortShortcuts(pinned);
   const sortedUnpinned = sortShortcuts(unpinned);
+  visibleShortcutCache = [...sortedPinned, ...sortedUnpinned];
+  renderedShortcutCount = 0;
 
-  if (!sortedPinned.length && !sortedUnpinned.length) {
+  if (!visibleShortcutCache.length) {
     appendShortcutEmptyState(t("emptyFiltered"));
     return;
   }
 
+  appendShortcutBatch(generation);
+}
+
+function appendShortcutBatch(generation) {
+  if (generation !== shortcutRenderGeneration) {
+    return;
+  }
+  elements.addShortcutButton.remove();
+  elements.shortcutGrid.querySelector(".shortcut-render-sentinel")?.remove();
+
+  const nextShortcuts = visibleShortcutCache.slice(
+    renderedShortcutCount,
+    renderedShortcutCount + SHORTCUT_BATCH_SIZE,
+  );
+
   const fragment = document.createDocumentFragment();
-
-  sortedPinned.forEach((shortcut) => {
+  nextShortcuts.forEach((shortcut) => {
     fragment.append(createShortcutCard(shortcut));
   });
-
-  sortedUnpinned.forEach((shortcut) => {
-    fragment.append(createShortcutCard(shortcut));
-  });
-
   elements.shortcutGrid.append(fragment);
+  renderedShortcutCount += nextShortcuts.length;
   elements.shortcutGrid.append(elements.addShortcutButton);
+
+  if (renderedShortcutCount >= visibleShortcutCache.length) {
+    return;
+  }
+
+  const sentinel = document.createElement("div");
+  sentinel.className = "shortcut-render-sentinel";
+  sentinel.setAttribute("aria-hidden", "true");
+  elements.shortcutGrid.append(sentinel);
+
+  const observer = new IntersectionObserver((entries) => {
+    if (entries.some((entry) => entry.isIntersecting)) {
+      observer.disconnect();
+      window.requestAnimationFrame(() => appendShortcutBatch(generation));
+    }
+  }, {rootMargin: "320px 0px"});
+  shortcutRenderObserver = observer;
+  observer.observe(sentinel);
 }
 
 function createShortcutCard(shortcut) {
@@ -1145,7 +1211,6 @@ function createShortcutCard(shortcut) {
   const favicon = node.querySelector(".shortcut-card__favicon");
   const title = node.querySelector(".shortcut-card__title");
   const meta = node.querySelector(".shortcut-card__meta");
-  const editButton = node.querySelector('[data-action="edit"]');
   const pinButton = node.querySelector('[data-action="pin"]');
 
   node.dataset.id = shortcut.id;
@@ -1162,67 +1227,83 @@ function createShortcutCard(shortcut) {
   
   favicon.src = getFaviconUrl(shortcut.url);
   favicon.alt = `${shortcut.name} favicon`;
-
-  // Circular initial-letters fallback badge on loading error
-  favicon.onerror = () => {
-    const parent = favicon.parentElement;
-    if (parent) {
-      parent.innerHTML = "";
-      const badge = document.createElement("div");
-      badge.className = "shortcut-card__fallback-badge";
-      const name = displayShortcutName(shortcut.name) || "?";
-      badge.textContent = name.charAt(0).toUpperCase();
-      badge.style.cssText = `
-        width: 100%;
-        height: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background-color: ${getColorForName(name)};
-        color: #fff;
-        font-weight: bold;
-        font-size: 14px;
-        border-radius: 50%;
-        text-shadow: 0 1px 2px rgba(0,0,0,0.1);
-      `;
-      parent.appendChild(badge);
-    }
-  };
-
-  link.addEventListener("click", async (event) => {
-    event.preventDefault();
-    await recordShortcutClick(shortcut.id);
-    window.location.href = shortcut.url;
-  });
-
-  editButton.addEventListener("click", (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    showContextMenu(event, shortcut);
-  });
+  favicon.decoding = "async";
+  favicon.fetchPriority = "low";
 
   if (pinButton) {
-    pinButton.addEventListener("click", (event) => {
-      event.preventDefault();
-      void togglePin(shortcut.id);
-    });
     pinButton.setAttribute("aria-label", shortcut.pinned ? t("unpinAriaLabel") : t("pinAriaLabel"));
   }
 
-  // Right-click context menu positioning
-  node.addEventListener("contextmenu", (event) => {
+  return node;
+}
+
+async function handleShortcutGridClick(event) {
+  const card = event.target.closest(".shortcut-card");
+  if (!card || !elements.shortcutGrid.contains(card)) {
+    return;
+  }
+  const shortcut = shortcutLookup.get(card.dataset.id);
+  if (!shortcut) {
+    return;
+  }
+
+  const actionButton = event.target.closest("[data-action]");
+  if (actionButton) {
     event.preventDefault();
     event.stopPropagation();
-    showContextMenu(event, shortcut);
-  });
+    if (actionButton.dataset.action === "edit") {
+      showContextMenu(event, shortcut);
+    } else if (actionButton.dataset.action === "pin") {
+      await togglePin(shortcut.id);
+    }
+    return;
+  }
 
-  // Drag and drop event listeners
-  node.addEventListener("dragstart", onDragStart);
-  node.addEventListener("dragend", onDragEnd);
-  node.addEventListener("dragover", onDragOver);
-  node.addEventListener("drop", onDrop);
+  if (event.target.closest(".shortcut-card__link")) {
+    const usesNativeLinkBehavior =
+      event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
+    if (usesNativeLinkBehavior) {
+      void recordShortcutClick(shortcut.id);
+      return;
+    }
 
-  return node;
+    event.preventDefault();
+    await recordShortcutClick(shortcut.id);
+    window.location.href = shortcut.url;
+  }
+}
+
+function handleShortcutGridContextMenu(event) {
+  const card = event.target.closest(".shortcut-card");
+  if (!card || !elements.shortcutGrid.contains(card)) {
+    return;
+  }
+  const shortcut = shortcutLookup.get(card.dataset.id);
+  if (!shortcut) {
+    return;
+  }
+  event.preventDefault();
+  event.stopPropagation();
+  showContextMenu(event, shortcut);
+}
+
+function handleShortcutFaviconError(event) {
+  const favicon = event.target;
+  if (!(favicon instanceof HTMLImageElement) || !favicon.classList.contains("shortcut-card__favicon")) {
+    return;
+  }
+  const card = favicon.closest(".shortcut-card");
+  const shortcut = shortcutLookup.get(card?.dataset.id);
+  const parent = favicon.parentElement;
+  if (!parent || !shortcut) {
+    return;
+  }
+  const name = displayShortcutName(shortcut.name) || "?";
+  const badge = document.createElement("span");
+  badge.className = "shortcut-card__fallback-badge";
+  badge.textContent = name.charAt(0).toUpperCase();
+  badge.style.backgroundColor = getColorForName(name);
+  parent.replaceChildren(badge);
 }
 
 function appendShortcutEmptyState(message) {
@@ -1356,22 +1437,26 @@ function createCategoryButton({id, label, count, active, deletable}) {
 }
 
 function onDragStart(event) {
-  const card = event.currentTarget;
+  const card = event.target.closest(".shortcut-card");
+  if (!card || !elements.shortcutGrid.contains(card)) {
+    return;
+  }
   state.draggedId = card.dataset.id;
   state.draggedElement = card;
   state.didCategoryDrop = false;
   card.classList.add("is-dragging", "is-drop-source");
   
   // Track pinned status of the dragged shortcut
-  const shortcut = state.shortcuts.find(s => s.id === state.draggedId);
+  const shortcut = shortcutLookup.get(state.draggedId);
   state.draggedIsPinned = shortcut ? !!shortcut.pinned : false;
 
-  event.dataTransfer.effectAllowed = canManualReorder() ? "move" : "copy";
+  event.dataTransfer.effectAllowed = "copyMove";
   event.dataTransfer.setData("text/plain", state.draggedId);
 }
 
-function onDragEnd(event) {
-  event.currentTarget.classList.remove("is-dragging", "is-drop-source");
+function onDragEnd() {
+  state.draggedElement?.classList.remove("is-dragging", "is-drop-source");
+  elements.shortcutGrid.querySelectorAll(".is-drop-target").forEach((card) => card.classList.remove("is-drop-target"));
   if (canManualReorder() && !state.didCategoryDrop) {
     syncShortcutsFromDom();
     void persistShortcuts();
@@ -1383,19 +1468,32 @@ function onDragEnd(event) {
 }
 
 function onDragOver(event) {
-  if (!canManualReorder()) {
+  const targetCard = event.target.closest(".shortcut-card");
+  if (!targetCard || !elements.shortcutGrid.contains(targetCard)) {
     return;
+  }
+
+  if (!canManualReorder()) {
+    const canEnterManualMode = !state.shortcutSearchQuery && state.selectedCategory === "all";
+    if (!canEnterManualMode) {
+      return;
+    }
+    // Direct manipulation wins over the current display sort. The first time
+    // a card is dragged over another card, preserve the visible order as the
+    // new manual baseline and continue the same gesture without interruption.
+    state.sortMode = "manual";
+    elements.sortSelect.value = "manual";
+    void saveSortMode("manual");
   }
   event.preventDefault();
   event.dataTransfer.dropEffect = "move";
-  const targetCard = event.currentTarget;
   const draggedCard = state.draggedElement;
   if (!draggedCard || draggedCard === targetCard) {
     return;
   }
 
   // Boundary check: pinned items drag-sorting only within their zone
-  const targetShortcut = state.shortcuts.find(s => s.id === targetCard.dataset.id);
+  const targetShortcut = shortcutLookup.get(targetCard.dataset.id);
   const targetIsPinned = targetShortcut ? !!targetShortcut.pinned : false;
   
   if (state.draggedIsPinned !== targetIsPinned) {
@@ -1406,8 +1504,14 @@ function onDragOver(event) {
   const referenceNode = shouldInsertAfter ? targetCard.nextSibling : targetCard;
 
   if (referenceNode !== draggedCard) {
+    const previousRects = new Map(
+      [...elements.shortcutGrid.querySelectorAll(".shortcut-card")].map((card) => [card, card.getBoundingClientRect()]),
+    );
     elements.shortcutGrid.insertBefore(draggedCard, referenceNode);
+    animateShortcutReorder(previousRects);
   }
+  elements.shortcutGrid.querySelectorAll(".is-drop-target").forEach((card) => card.classList.remove("is-drop-target"));
+  targetCard.classList.add("is-drop-target");
 }
 
 function onDrop(event) {
@@ -1416,7 +1520,30 @@ function onDrop(event) {
   }
   event.preventDefault();
   syncShortcutsFromDom();
-  void persistShortcuts();
+}
+
+function animateShortcutReorder(previousRects) {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    return;
+  }
+  previousRects.forEach((previousRect, card) => {
+    if (card === state.draggedElement || !card.isConnected) {
+      return;
+    }
+    const nextRect = card.getBoundingClientRect();
+    const deltaX = previousRect.left - nextRect.left;
+    const deltaY = previousRect.top - nextRect.top;
+    if (!deltaX && !deltaY) {
+      return;
+    }
+    card.animate(
+      [
+        {transform: `translate3d(${deltaX}px, ${deltaY}px, 0)`},
+        {transform: "translate3d(0, 0, 0)"},
+      ],
+      {duration: 220, easing: "cubic-bezier(0.22, 1, 0.36, 1)"},
+    );
+  });
 }
 
 function getShouldInsertAfter(targetCard, event) {
@@ -1437,7 +1564,10 @@ function syncShortcutsFromDom() {
   }
 
   const shortcutMap = new Map(state.shortcuts.map((shortcut) => [shortcut.id, shortcut]));
-  state.shortcuts = orderedIds.map((id) => shortcutMap.get(id)).filter(Boolean);
+  const orderedSet = new Set(orderedIds);
+  const orderedShortcuts = orderedIds.map((id) => shortcutMap.get(id)).filter(Boolean);
+  const untouchedShortcuts = state.shortcuts.filter((shortcut) => !orderedSet.has(shortcut.id));
+  state.shortcuts = [...orderedShortcuts, ...untouchedShortcuts];
 }
 
 async function assignShortcutToCategory(shortcutId, categoryName) {
@@ -1908,7 +2038,7 @@ function getVisibleShortcuts() {
   const searchQuery = state.shortcutSearchQuery;
   const selectedCategory = state.selectedCategory;
 
-  return sortShortcuts(state.shortcuts.filter((shortcut) => {
+  return state.shortcuts.filter((shortcut) => {
     if (selectedCategory !== "all" && !shortcut.categories.includes(selectedCategory)) {
       return false;
     }
@@ -1926,7 +2056,7 @@ function getVisibleShortcuts() {
     ].join(" ").toLowerCase();
 
     return haystack.includes(searchQuery);
-  }));
+  });
 }
 
 function sortShortcuts(shortcuts) {

@@ -63,7 +63,7 @@ export function isProbablyValidUrl(value) {
 export function getFaviconUrl(value) {
   try {
     const url = new URL(value);
-    return `https://www.google.com/s2/favicons?sz=64&domain_url=${encodeURIComponent(url.origin)}`;
+    return `https://www.google.com/s2/favicons?sz=32&domain_url=${encodeURIComponent(url.origin)}`;
   } catch {
     return "";
   }

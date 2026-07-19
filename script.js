@@ -71,6 +71,8 @@ const elements = {
   nameInput: document.querySelector("#nameInput"),
   urlInput: document.querySelector("#urlInput"),
   categoriesInput: document.querySelector("#categoriesInput"),
+  categoryChips: document.querySelector("#categoryChips"),
+  categoriesHiddenInput: document.querySelector("#categoriesHiddenInput"),
   categorySuggestions: document.querySelector("#categorySuggestions"),
   addShortcutButton: document.querySelector("#addShortcutButton"),
   
@@ -754,6 +756,8 @@ function bindEvents() {
   elements.themeToggleButton.addEventListener("click", toggleTheme);
   elements.form.addEventListener("submit", handleShortcutSubmit);
   elements.form.addEventListener("keydown", handleShortcutFormKeydown);
+  elements.categoriesInput.addEventListener("keydown", handleCategoryChipInput);
+  elements.categoriesInput.addEventListener("input", handleCategoryChipInput);
   colorSchemeQuery.addEventListener("change", handleSystemThemeChange);
   elements.dialog.addEventListener("click", handleDialogBackdropClick);
 }
@@ -1414,13 +1418,21 @@ function createCategoryButton({id, label, count, active, deletable}) {
   }
 
   // Handle Drag Over elements to categorise them
-  item.addEventListener("dragover", (event) => {
+  item.addEventListener("dragenter", (event) => {
     event.preventDefault();
     item.classList.add("dragover");
   });
 
-  item.addEventListener("dragleave", () => {
-    item.classList.remove("dragover");
+  item.addEventListener("dragover", (event) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    item.classList.add("dragover");
+  });
+
+  item.addEventListener("dragleave", (event) => {
+    if (!item.contains(event.relatedTarget)) {
+      item.classList.remove("dragover");
+    }
   });
 
   item.addEventListener("drop", async (event) => {
@@ -1571,6 +1583,9 @@ function syncShortcutsFromDom() {
 }
 
 async function assignShortcutToCategory(shortcutId, categoryName) {
+  if (categoryName === "all") {
+    return;
+  }
   state.didCategoryDrop = true;
   state.shortcuts = state.shortcuts.map((shortcut) => {
     if (shortcut.id !== shortcutId) {
@@ -1781,22 +1796,71 @@ async function clearCustomLogo() {
   await removeLocalOnlyStorage(CUSTOM_LOGO_STORAGE_KEY);
 }
 
+let currentChips = new Set();
+
+function renderChips() {
+  elements.categoryChips.textContent = "";
+  elements.categoriesHiddenInput.value = Array.from(currentChips).join(", ");
+  for (const chip of currentChips) {
+    const chipEl = document.createElement("span");
+    chipEl.className = "category-chip";
+    const label = document.createElement("span");
+    label.textContent = displayCategoryName(chip);
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "category-chip__remove";
+    removeBtn.type = "button";
+    removeBtn.innerHTML = "&times;";
+    removeBtn.ariaLabel = "Remove tag";
+    removeBtn.addEventListener("click", () => {
+      currentChips.delete(chip);
+      renderChips();
+    });
+    chipEl.append(label, removeBtn);
+    elements.categoryChips.append(chipEl);
+  }
+}
+
+function handleCategoryChipInput(event) {
+  if (event.type === "keydown" && event.key === "Enter") {
+    event.preventDefault();
+  }
+  if ((event.type === "keydown" && event.key === "Enter") || event.type === "input") {
+    const val = elements.categoriesInput.value.trim();
+    if (!val) return;
+    
+    // For input event on datalist, the browser sets the value to the option's value
+    const isFromDatalist = event.type === "input" && Array.from(elements.categorySuggestions.options).some(opt => opt.value === val);
+    const isEnter = event.type === "keydown" && event.key === "Enter";
+    
+    if (isFromDatalist || isEnter) {
+      const parts = parseCategories(val);
+      for (const p of parts) {
+        currentChips.add(p);
+      }
+      renderChips();
+      elements.categoriesInput.value = "";
+    }
+  }
+}
+
 function openDialog(id) {
   state.editingId = id ?? null;
   const shortcut = state.shortcuts.find((item) => item.id === id);
+  currentChips.clear();
 
   if (shortcut) {
     elements.nameInput.value = shortcut.name;
     elements.urlInput.value = shortcut.url;
-    elements.categoriesInput.value = shortcut.categories.join(", ");
+    shortcut.categories.forEach(c => currentChips.add(c));
     elements.deleteShortcutButton.style.display = "inline-block";
   } else {
     elements.nameInput.value = "";
     elements.urlInput.value = "";
-    elements.categoriesInput.value = "";
     elements.deleteShortcutButton.style.display = "none";
   }
 
+  elements.categoriesInput.value = "";
+  renderChips();
   updateDialogTitle();
   renderCategorySuggestions();
   elements.dialog.showModal();
@@ -1808,6 +1872,8 @@ function closeDialog() {
     elements.dialog.close();
   }
   elements.form.reset();
+  currentChips.clear();
+  renderChips();
   state.editingId = null;
   updateDialogTitle();
 }
@@ -1841,7 +1907,9 @@ async function handleShortcutSubmit(event) {
   const formData = new FormData(elements.form);
   const rawUrl = String(formData.get("url") ?? "").trim();
   const existingShortcut = state.shortcuts.find((item) => item.id === state.editingId);
-  const categories = parseCategories(String(formData.get("categories") ?? ""));
+  const pendingCategory = elements.categoriesInput.value.trim();
+  const combinedCategories = [...Array.from(currentChips), ...parseCategories(pendingCategory)];
+  const categories = Array.from(new Set(combinedCategories));
   const shortcut = {
     id: state.editingId ?? crypto.randomUUID(),
     name: normalizeLocalizedLabel(String(formData.get("name") ?? "").trim()),
@@ -2061,21 +2129,26 @@ function getVisibleShortcuts() {
 
 function sortShortcuts(shortcuts) {
   const items = [...shortcuts];
+  const lang = state.language === "en" ? "en" : "zh-CN";
 
   switch (state.sortMode) {
     case "manual":
       return items;
     case "name-asc":
-      return items.sort((left, right) => displayShortcutName(left.name).localeCompare(displayShortcutName(right.name), state.language === "en" ? "en" : "zh-CN"));
+      return items.sort((left, right) => displayShortcutName(left.name).localeCompare(displayShortcutName(right.name), lang));
     case "name-desc":
-      return items.sort((left, right) => displayShortcutName(right.name).localeCompare(displayShortcutName(left.name), state.language === "en" ? "en" : "zh-CN"));
+      return items.sort((left, right) => displayShortcutName(right.name).localeCompare(displayShortcutName(left.name), lang));
     case "newest":
-      return items.sort((left, right) => right.createdAt - left.createdAt);
+      return items.sort((left, right) => (Number(right.createdAt) || 0) - (Number(left.createdAt) || 0));
     case "oldest":
-      return items.sort((left, right) => left.createdAt - right.createdAt);
+      return items.sort((left, right) => (Number(left.createdAt) || 0) - (Number(right.createdAt) || 0));
     case "click-desc":
     default:
-      return items.sort((left, right) => right.clickCount - left.clickCount || right.createdAt - left.createdAt);
+      return items.sort((left, right) => {
+        const clicksDiff = (Number(right.clickCount) || 0) - (Number(left.clickCount) || 0);
+        if (clicksDiff !== 0) return clicksDiff;
+        return (Number(right.createdAt) || 0) - (Number(left.createdAt) || 0);
+      });
   }
 }
 

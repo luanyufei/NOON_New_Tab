@@ -519,6 +519,55 @@ body[data-theme="light"].has-wallpaper .shortcuts::before {
   background: var(--chip-bg);
 }
 
+.category-item.dragover {
+  background: var(--chip-bg-hover, var(--chip-bg));
+  box-shadow: 0 0 0 2px var(--focus-ring, #8ab4f8);
+  transform: scale(1.02);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.category-chips-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.category-chips-container:empty {
+  display: none;
+}
+.category-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: var(--chip-bg);
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+.category-chip__remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.1);
+  color: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+body[data-theme="dark"] .category-chip__remove {
+  background: rgba(255, 255, 255, 0.15);
+}
+.category-chip__remove:hover {
+  background: var(--focus-ring, #8ab4f8);
+  color: #fff;
+}
+
 .category-item__delete {
   opacity: 0;
 }

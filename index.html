@@ -199,10 +199,12 @@
           <input id="urlInput" name="url" type="text" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="例如：bilibili.com" required>
         </label>
 
-        <label class="field">
+        <label class="field" id="categoryFieldContainer">
           <span>分类</span>
-          <input id="categoriesInput" name="categories" type="text" maxlength="160" list="categorySuggestions" placeholder="例如：视频|Video, 娱乐|Entertainment">
-          <small class="field__hint">可选已有分类；直接输入可新建。多个分类可用中英文逗号分隔，用｜分隔中英文（可选）</small>
+          <div class="category-chips-container" id="categoryChips"></div>
+          <input id="categoriesInput" type="text" maxlength="160" list="categorySuggestions" placeholder="选择或输入并回车添加分类...">
+          <input type="hidden" id="categoriesHiddenInput" name="categories">
+          <small class="field__hint">可选已有分类；直接输入并回车可新建多个标签</small>
         </label>
 
         <div class="shortcut-form__actions">
